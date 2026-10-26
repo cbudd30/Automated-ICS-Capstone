@@ -77,6 +77,29 @@ servers:
       check_contains: "mcp"
       install_command: ["trivy", "plugin", "install", "mcp@v0.0.20"]
 
+  # nmap MCP server — used exclusively by NmapNetworkAgent (agents/nmap_network_agent.py).
+  # This is a SEPARATE agent from NetworkAssessmentAgent (which runs nmap as a subprocess).
+  #
+  # gc-nmap-mcp is an Apache-2.0 TypeScript MCP server that wraps nmap as a single
+  # `do-nmap` tool. It is launched on demand with npx (no global install needed).
+  # Requires: nmap on the host, NMAP_PATH env var pointing to the binary.
+  #
+  # ICS safety: the NmapNetworkAgent is instructed to use only ICS-safe flags
+  # (-sT -T2, targeted port list). These are enforced via agent instructions, so
+  # exercise caution on live OT networks.
+  #
+  # To disable this agent, set enabled: false below.
+  nmap:
+    enabled: true
+    role: network_scanner
+    command: npx
+    args: ["-y", "gc-nmap-mcp"]
+    env:
+      NMAP_PATH: "${NMAP_PATH:-/usr/bin/nmap}"
+    client_session_timeout_seconds: 300
+    allowed_tools:
+      - do-nmap
+
 # Per-tool argument rules enforced by mcp/policy.py.
 argument_policy:
   scan_image:
