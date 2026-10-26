@@ -77,6 +77,20 @@ servers:
       check_contains: "mcp"
       install_command: ["trivy", "plugin", "install", "mcp@v0.0.20"]
 
+  # nmap is used by the NetworkAssessmentAgent for port scanning and ICS protocol
+  # discovery. It runs as a subprocess (not an MCP server) via network_scanner.py,
+  # so no MCP entry is needed here. The settings below control its behaviour.
+  #
+  # nmap is NOT launched through MCP because:
+  # 1. No production-grade nmap MCP server exists with ICS-safe defaults.
+  # 2. Direct subprocess control gives us full flag enforcement and XML parsing
+  #    without a third-party dependency.
+  # 3. The scanner runs before the agent (like Trivy), so the agent only reads
+  #    pre-collected evidence rather than triggering live scans.
+  #
+  # To disable network scanning entirely, set:
+  #   experiment.network_scan.enabled: false   (in config/experiment.yaml)
+
 # Per-tool argument rules enforced by mcp/policy.py.
 argument_policy:
   scan_image:

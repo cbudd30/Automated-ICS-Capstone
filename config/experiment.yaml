@@ -29,6 +29,17 @@ scan:
   # Page size when pulling findings out of trivy-mcp.
   page_size: 500
 
+network_scan:
+  enabled: true
+  # ICS-safe timing: T2 (polite). Use T3 for IT-only labs with no real PLCs.
+  timing: T2
+  # Hard timeout per subnet (seconds). Increase for large or slow ICS subnets.
+  timeout_per_subnet_seconds: 300
+  # Run ICS protocol discovery scripts (modbus-discover, s7-info, enip-info, etc.)
+  run_ics_scripts: true
+  # Only scan subnets with prefix >= this (24 = /24 max = 256 hosts).
+  min_prefix_length: 24
+
 # Paths are relative to the project root.
 data_dir: data
 output_dir: outputs

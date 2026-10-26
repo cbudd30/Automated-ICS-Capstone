@@ -216,12 +216,28 @@ class ScanConfig(BaseModel):
     page_size: int = 500
 
 
+class NetworkScanConfig(BaseModel):
+    """Configuration for the nmap-based network scanner (NetworkAssessmentAgent)."""
+
+    enabled: bool = True
+    # ICS-safe timing template. T2=polite, T3=normal. Never T4/T5 on live ICS.
+    timing: str = "T2"
+    # Wall-clock timeout per subnet. Large /24s with slow ICS devices may need more.
+    timeout_per_subnet_seconds: float = 300.0
+    # Run ICS NSE discovery scripts (modbus-discover, s7-info, etc.) after port scan.
+    run_ics_scripts: bool = True
+    # Only scan subnets with a prefix >= this value (prevents accidentally scanning
+    # huge corporate ranges; /24 = 256 hosts is the safe default).
+    min_prefix_length: int = 24
+
+
 class ExperimentConfig(BaseModel):
     # Names the environment/scenario being assessed; recorded in run manifests.
     scenario_id: str = "unspecified"
     objective: str
     default_model: str
     scan: ScanConfig = Field(default_factory=ScanConfig)
+    network_scan: NetworkScanConfig = Field(default_factory=NetworkScanConfig)
     data_dir: str = "data"
     output_dir: str = "outputs"
 

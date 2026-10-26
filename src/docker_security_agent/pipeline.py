@@ -92,6 +92,15 @@ from docker_security_agent.reporting.generator import build_report, write_report
 from docker_security_agent.schemas.assets import InventorySnapshot
 from docker_security_agent.schemas.findings import Finding
 from docker_security_agent.schemas.observations import ImageScanResult
+from docker_security_agent.agents.network_assessment import (
+    NetworkAgentRunOutcome,
+    NetworkEvidenceStore,
+    build_network_agent,
+    build_network_evidence_tools,
+    build_network_input,
+    run_network_agent,
+)
+from docker_security_agent.schemas.network import NetworkAssessment, NetworkScanResult
 from docker_security_agent.schemas.reports import (
     DockerEndpointInfo,
     MCPServerInfo,
@@ -100,6 +109,11 @@ from docker_security_agent.schemas.reports import (
     RunMetrics,
 )
 from docker_security_agent.security import rules
+from docker_security_agent.security.network_scanner import (
+    nmap_available,
+    nmap_version,
+    scan_network_subnets,
+)
 from docker_security_agent.security.scanner import scan_images, trivy_version
 from docker_security_agent.security.validation import ValidationOutcome, validate_agent_output
 from docker_security_agent.security.vulnerability_parser import vulnerability_findings
@@ -442,6 +456,27 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
                 check_range,
             )
 
+        # 3b. network phase (nmap + NetworkAssessmentAgent)
+        net_scans: list[NetworkScanResult] = []
+        net_outcome: NetworkAgentRunOutcome | None = None
+        net_scanning = settings.experiment.network_scan.enabled and not replay
+        if net_scanning:
+            net_scans, net_outcome = await _network_phase(
+                settings,
+                opts,
+                bundle,
+                recorder,
+                snapshot,
+                findings,
+                objective,
+                run_id,
+                session_id,
+            )
+            if net_outcome and net_outcome.error:
+                errors.append(f"network_agent: {net_outcome.error}")
+        elif replay:
+            _say(opts, "Network scanning skipped in replay mode")
+
         # 4. validate the agent output against the evidence
         validation: ValidationOutcome | None = None
         agent_status = "skipped"
@@ -475,6 +510,22 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
         agent_failed = outcome is not None and outcome.status != "ok"
         status = (
             "completed_with_errors" if (agent_failed or snapshot.collection_errors) else "completed"
+        )
+
+        # 5b. persist network scan results
+        net_assessment: NetworkAssessment | None = (
+            net_outcome.assessment if net_outcome else None
+        )
+        net_scan_status = (
+            net_outcome.status if net_outcome else ("skipped" if not net_scanning else "no_agent")
+        )
+        if net_outcome:
+            metrics.tool_calls_total += 0  # recorder already counts these
+        # Store network assessment in run record for reporting
+        repo.update_run(
+            run_id,
+            network_scan_status=net_scan_status,
+            network_assessment_json=net_assessment.model_dump_json() if net_assessment else None,
         )
 
         # 6. report
@@ -527,6 +578,90 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
         raise
     finally:
         repo.close()
+
+
+# ---------------------------------------------------------------------------
+# Network phase: nmap subnet scanning + NetworkAssessmentAgent
+# ---------------------------------------------------------------------------
+
+
+async def _network_phase(
+    settings: Settings,
+    opts: AssessOptions,
+    bundle: ModelBundle | None,
+    recorder: ToolCallRecorder,
+    snapshot: InventorySnapshot,
+    docker_findings: list[Finding],
+    objective: str,
+    run_id: str,
+    session_id: str,
+) -> tuple[list[NetworkScanResult], NetworkAgentRunOutcome | None]:
+    """Run nmap against Docker subnets, then run the NetworkAssessmentAgent.
+
+    Returns the list of scan results and the agent outcome (None if no model).
+    Always returns (even on scan errors) so the rest of the pipeline continues.
+    """
+    net_cfg = settings.experiment.network_scan
+
+    # --- nmap availability check ---
+    if not nmap_available():
+        _say(opts, "Network scanning skipped: nmap is not installed or not on PATH")
+        return [], None
+
+    # --- subnet scanning ---
+    _say(opts, "Starting network scan (nmap, ICS-safe TCP connect)...")
+    net_scans = scan_network_subnets(
+        snapshot,
+        timeout_per_subnet_seconds=net_cfg.timeout_per_subnet_seconds,
+        progress=lambda i, n, s: _say(opts, f"Scanning subnet {i}/{n}: {s}"),
+    )
+    total_open = sum(len(s.open_ports) for s in net_scans)
+    total_ics  = sum(len(s.ics_hits)   for s in net_scans)
+    _say(
+        opts,
+        f"Network scan complete: {len(net_scans)} subnet(s), "
+        f"{total_open} open port(s), {total_ics} ICS protocol hit(s)",
+    )
+    for s in net_scans:
+        if s.status != "ok":
+            _say(opts, f"  Warning: scan of {s.target} failed: {s.error}")
+
+    # --- network agent ---
+    if bundle is None:
+        return net_scans, None
+
+    store = NetworkEvidenceStore(
+        snapshot=snapshot,
+        scans=net_scans,
+        docker_findings=docker_findings,
+    )
+    agent        = build_network_agent(bundle)
+    evidence_tools = build_network_evidence_tools(store, recorder)
+    limits       = settings.agent.limits
+
+    _say(
+        opts,
+        f"Running {agent.name} with {bundle.profile.name} "
+        f"(max {limits.max_turns} turns, {limits.max_tool_calls} tool calls, "
+        f"{limits.max_duration_seconds:.0f}s)...",
+    )
+    from docker_security_agent.memory.sessions import open_session
+    outcome = await run_network_agent(
+        agent,
+        build_network_input(objective, store),
+        evidence_tools,
+        max_turns=limits.max_turns,
+        timeout_seconds=limits.max_duration_seconds,
+        session=open_session(f"net-{session_id}", settings.session_db_path),
+        tracing_enabled=settings.agent.tracing_enabled,
+        run_id=run_id,
+    )
+    _say(
+        opts,
+        f"NetworkAgent finished: {outcome.status} in {outcome.duration_seconds}s "
+        f"({recorder.agent_calls} total tool calls)",
+    )
+    return net_scans, outcome
 
 
 # ---------------------------------------------------------------------------
