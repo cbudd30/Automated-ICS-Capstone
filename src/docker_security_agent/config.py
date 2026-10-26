@@ -140,7 +140,7 @@ class MCPServerConfig(BaseModel):
 
     name: str = ""  # filled in from the YAML key
     enabled: bool = True
-    role: Literal["docker_inspection", "image_scanner"]
+    role: Literal["docker_inspection", "image_scanner", "network_scanner"]
     command: str
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)

@@ -742,5 +742,168 @@ def report(
             console.print(Markdown(md))
 
 
+@app.command(name="nmap-scan")
+def nmap_scan(
+    targets: Annotated[
+        list[str],
+        typer.Option("--target", "-t", help="IP, CIDR, or hostname to scan (repeatable)."),
+    ],
+    model: Annotated[
+        str | None,
+        typer.Option("--model", "-m", help="Model profile name (see config/models.yaml)."),
+    ] = None,
+    objective: Annotated[
+        str,
+        typer.Option("--objective", help="Custom assessment objective."),
+    ] = "",
+    max_turns: Annotated[int, typer.Option("--max-turns")] = 20,
+    timeout: Annotated[float, typer.Option("--timeout", help="Wall-clock limit in seconds.")] = 600.0,
+    output_json: Annotated[
+        str | None, typer.Option("--output", "-o", help="Write JSON result to this file.")
+    ] = None,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False,
+) -> None:
+    """Run the standalone NmapNetworkAgent against one or more targets.
+
+    Uses the gc-nmap-mcp MCP server (do-nmap tool). Requires nmap installed
+    and NMAP_PATH set (defaults to /usr/bin/nmap).
+
+    Examples
+    --------
+      docker-audit nmap-scan --target 192.168.95.0/24
+      docker-audit nmap-scan -t 10.0.0.1 -t 10.0.0.2 --model gpt-4o
+    """
+    import uuid
+    from docker_security_agent.agents.nmap_network_agent import (
+        build_nmap_agent,
+        build_nmap_input,
+        run_nmap_agent,
+    )
+    from docker_security_agent.llm.factory import ModelBundle
+    from docker_security_agent.mcp.policy import ToolPolicy
+    from docker_security_agent.mcp.recorder import ToolCallRecorder
+    from docker_security_agent.mcp.redaction import Redactor
+    from docker_security_agent.mcp.registry import build_servers, connect
+
+    if not targets:
+        console.print("[red]Error:[/red] at least one --target is required.")
+        raise typer.Exit(1)
+
+    settings = _settings()
+    profile = settings.get_profile(model)
+
+    if "nmap" not in settings.mcp.servers or not settings.mcp.servers["nmap"].enabled:
+        console.print(
+            "[red]Error:[/red] nmap MCP server is not configured or is disabled.\n"
+            "Check the 'nmap' entry in config/mcp_servers.yaml."
+        )
+        raise typer.Exit(1)
+
+    run_id = str(uuid.uuid4())[:8]
+    console.print(
+        Panel(
+            f"[bold]NmapNetworkAgent[/bold]  run={run_id}  model={profile.model}\n"
+            f"Targets: {', '.join(targets)}",
+            title="docker-audit nmap-scan",
+        )
+    )
+
+    async def _run() -> None:
+        policy = ToolPolicy(settings.mcp)
+        redactor = Redactor(settings.mcp.redaction)
+        recorder = ToolCallRecorder(max_calls=max_turns * 3)
+
+        servers = build_servers(
+            settings, policy, redactor, recorder, roles={"network_scanner"}
+        )
+        if not servers:
+            console.print("[red]Error:[/red] No network_scanner MCP servers are active.")
+            raise typer.Exit(1)
+
+        async with connect(servers) as mgr:
+            active = list(mgr.active_servers)
+            if not active:
+                console.print(
+                    "[red]Error:[/red] nmap MCP server failed to start.\n"
+                    "Is nmap installed? Is NMAP_PATH set correctly?"
+                )
+                raise typer.Exit(1)
+
+            bundle = ModelBundle.from_profile(profile)
+            agent = build_nmap_agent(bundle, mcp_servers=active)
+            user_input = build_nmap_input(targets, objective=objective)
+            if verbose:
+                console.print("[dim]--- agent input ---[/dim]")
+                console.print(user_input)
+                console.print("[dim]---[/dim]")
+            outcome = await run_nmap_agent(
+                agent,
+                user_input,
+                max_turns=max_turns,
+                timeout_seconds=timeout,
+                run_id=run_id,
+            )
+
+        if outcome.status != "ok":
+            console.print(f"[red]Agent finished with status={outcome.status}[/red]")
+            if outcome.error:
+                console.print(f"[yellow]{outcome.error}[/yellow]")
+            raise typer.Exit(1)
+
+        assessment = outcome.assessment
+        console.print()
+        console.print(Panel(assessment.executive_summary, title="Executive Summary"))
+        console.print(f"[bold]Overall risk:[/bold] {assessment.overall_risk.upper()}")
+        console.print()
+
+        if assessment.exposed_ics_services:
+            t = Table(title=f"Exposed ICS Services ({len(assessment.exposed_ics_services)})")
+            for col in ("Host", "Port", "Protocol", "Risk", "Rationale"):
+                t.add_column(col, no_wrap=col in ("Host", "Port", "Risk"))
+            for svc in assessment.exposed_ics_services:
+                t.add_row(
+                    svc.host,
+                    str(svc.port),
+                    svc.protocol_name,
+                    svc.risk_level.upper(),
+                    svc.rationale[:80],
+                )
+            console.print(t)
+        else:
+            console.print("[green]No exposed ICS services found.[/green]")
+
+        if assessment.findings:
+            t2 = Table(title=f"Findings ({len(assessment.findings)})")
+            for col in ("Severity", "Host", "Port", "Title"):
+                t2.add_column(col, no_wrap=col in ("Severity", "Host", "Port"))
+            for f in assessment.findings:
+                t2.add_row(
+                    f.severity.upper(),
+                    f.host,
+                    str(f.port) if f.port else "",
+                    f.title,
+                )
+            console.print(t2)
+
+        if assessment.recommendations:
+            console.print("\n[bold]Recommendations:[/bold]")
+            for i, rec in enumerate(assessment.recommendations, 1):
+                console.print(f"  {i}. {rec}")
+
+        console.print(
+            f"\n[dim]Finished in {outcome.duration_seconds:.1f}s  |  "
+            f"tokens: {outcome.usage.get('total_tokens', 'n/a')}[/dim]"
+        )
+
+        if output_json:
+            import pathlib
+            out = pathlib.Path(output_json)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(assessment.model_dump_json(indent=2))
+            console.print(f"[green]JSON written to {output_json}[/green]")
+
+    asyncio.run(_run())
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
