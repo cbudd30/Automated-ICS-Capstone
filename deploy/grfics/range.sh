@@ -167,7 +167,7 @@ cmd_reset() {
   wait_healthy
 
   log "Verifying the range against baseline '$name' (read-only, via the proxy)"
-  "${AUDIT[@]}" range verify "$name" --since "$start"
+  "${AUDIT[@]}" range verify "$name" --since "$start" --project "$PROJECT"
 }
 
 case "${1:-}" in

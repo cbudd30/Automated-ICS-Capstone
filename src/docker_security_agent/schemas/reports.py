@@ -1,15 +1,23 @@
 """Report models.
 
-Two families live here:
+Four families live here:
 
-1. ``AgentAssessment`` - the structured output the LLM must return. It is kept
+1. ``AgentAssessment`` - the structured output the LLM must return: its own
+   findings, each backed by evidence it read with MCP tools. It is kept
    deliberately simple (only required fields, no dicts, no defaults) because
    strict JSON-schema mode at OpenAI, and many local models, cope badly with
    optional/complex schemas.
 
-2. ``Report`` - the final report written to ``report.json`` and rendered to
-   ``report.md``. It combines deterministic findings, scanner results, the
-   (validated) agent analysis and run metrics.
+2. ``Report`` - the deterministic report (``deterministic_report.json`` /
+   ``.md``): inventory, rule findings, scanner results and run metrics. It is
+   the answer key the agent is compared against.
+
+3. ``AgentReport`` - the agent report (``agent_report.json`` / ``.md``): only
+   what the agent found, after validation.
+
+4. ``Comparison`` - agent vs deterministic (``comparison.json`` / ``.md``):
+   which deterministic findings the agent found or missed, and what it
+   reported beyond them.
 """
 
 from __future__ import annotations
@@ -26,30 +34,28 @@ from docker_security_agent.schemas.findings import Finding
 # ---------------------------------------------------------------------------
 
 
-class PrioritizedItem(BaseModel):
-    """The agent's ranking of an EXISTING confirmed finding."""
+class AgentEvidence(BaseModel):
+    """One fact the agent read from a tool result."""
 
-    # NOTE: no example ID in the description - an example ID was copied
-    # verbatim by qwen3 in live testing ("F-C008-1a2b3c4d5e").
-    finding_id: str = Field(
-        description="Exact finding_id of a confirmed finding, copied from get_rule_findings"
+    tool: str = Field(description="Tool whose output showed this, e.g. container_inspect")
+    field: str = Field(
+        description="Field path in that output, e.g. HostConfig.Privileged or Mounts.Source"
     )
-    rank: int = Field(description="1 = most urgent")
-    rationale: str = Field(description="Why this matters in an OT/ICS context")
+    value: str = Field(description="The value you observed, copied from the tool output")
 
 
-class PotentialConcern(BaseModel):
-    """A NEW concern the agent infers that no deterministic rule produced."""
+class AgentFinding(BaseModel):
+    """One security issue the agent found by itself."""
 
     title: str
-    resource_name: str = Field(description="Exact name of the affected container/image/network")
-    category: str
+    resource_name: str = Field(description="Exact name of the affected container, image or network")
     severity: Literal["critical", "high", "medium", "low", "info"]
-    explanation: str
-    remediation: str
-    evidence_refs: list[str] = Field(
-        description="Finding IDs, CVE IDs or inspect field paths that support this concern"
+    evidence: list[AgentEvidence]
+    vulnerability_ids: list[str] = Field(
+        description="CVE/GHSA IDs copied from Trivy findings for this resource; [] otherwise"
     )
+    explanation: str = Field(description="Why this matters in an OT/ICS context")
+    remediation: str
 
 
 class AgentAssessment(BaseModel):
@@ -57,8 +63,7 @@ class AgentAssessment(BaseModel):
 
     executive_summary: str
     overall_risk: Literal["critical", "high", "medium", "low"]
-    prioritized_findings: list[PrioritizedItem]
-    potential_concerns: list[PotentialConcern]
+    findings: list[AgentFinding] = Field(description="Most urgent first")
     recommendations: list[str]
     limitations: list[str]
 
@@ -155,8 +160,6 @@ class PrioritizedEntry(BaseModel):
     title: str
     resource_name: str
     severity: str
-    rationale: str
-    ranked_by: Literal["agent", "deterministic"]
 
 
 class RunMetrics(BaseModel):
@@ -178,8 +181,7 @@ class RunMetrics(BaseModel):
 
 
 class ReportSummary(BaseModel):
-    overall_risk: str
-    risk_source: Literal["agent", "deterministic"]
+    overall_risk: str  # highest severity found by the rules and scanner
     executive_summary: str
     containers_total: int
     containers_running: int
@@ -192,9 +194,9 @@ class ReportSummary(BaseModel):
 
 
 class Report(BaseModel):
-    """Contents of report.json (report.md is rendered from this)."""
+    """Contents of deterministic_report.json (the .md is rendered from this)."""
 
-    report_version: str = "1.0"
+    report_version: str = "2.0"
     run_id: str
     status: str
     objective: str
@@ -214,11 +216,92 @@ class Report(BaseModel):
     images: list[ImageRow]
     networks: list[NetworkRow]
     findings: list[Finding]  # confirmed (rule + scanner), sorted
-    potential_concerns: list[Finding]  # agent-proposed, validated
-    rejected_agent_claims: list[Finding]  # failed validation (kept for transparency)
     vulnerabilities: list[ImageVulnerabilitySummary]
     prioritized: list[PrioritizedEntry]
     recommendations: list[str]
     limitations: list[str]
     errors: list[str]
     metrics: RunMetrics
+
+
+class AgentReport(BaseModel):
+    """Contents of agent_report.json: only what the agent found by itself."""
+
+    report_version: str = "2.0"
+    run_id: str
+    generated_at: datetime
+    model: ModelInfo
+    prompt_version: str
+    agent_status: str  # ok / error / timeout / max_turns / invalid_output
+    snapshot_id: str
+    executive_summary: str
+    overall_risk: str | None  # None when the agent produced no valid assessment
+    findings: list[Finding]  # validated (status potential), in the agent's order
+    rejected: list[Finding]  # failed validation (kept for transparency)
+    out_of_scope: list[Finding]  # about excluded assessment infrastructure
+    recommendations: list[str]
+    limitations: list[str]
+    validation_notes: list[str]
+    errors: list[str]
+    metrics: RunMetrics
+
+
+# ---------------------------------------------------------------------------
+# 4. Agent vs deterministic
+# ---------------------------------------------------------------------------
+
+
+class FindingRef(BaseModel):
+    finding_id: str
+    rule_id: str
+    title: str
+    resource_name: str
+    severity: str
+
+
+class MatchedFinding(BaseModel):
+    """A deterministic finding and the agent findings that cover it."""
+
+    deterministic: FindingRef
+    agent_finding_ids: list[str]
+    agent_severity: str  # highest severity the agent gave it
+    severity_agreement: Literal["same", "higher", "lower"]  # agent vs deterministic
+
+
+class SeverityRecall(BaseModel):
+    severity: str
+    total: int
+    found: int
+
+
+class ComparisonScores(BaseModel):
+    deterministic_total: int
+    found: int
+    missed: int
+    recall: float  # found / total (0..1)
+    weighted_recall: float  # weighted by severity rank: critical 4 ... low 1, info 0
+    by_severity: list[SeverityRecall]
+    agent_total: int  # agent findings, excluding out-of-scope ones
+    agent_matched: int  # cover at least one deterministic finding
+    agent_unmatched: int  # validated, but cover no deterministic finding
+    agent_rejected: int  # failed validation
+    match_rate: float  # agent_matched / agent_total (0..1)
+    rejection_rate: float  # agent_rejected / agent_total (0..1)
+
+
+class Comparison(BaseModel):
+    """Contents of comparison.json."""
+
+    report_version: str = "2.0"
+    run_id: str
+    generated_at: datetime
+    model: ModelInfo
+    agent_status: str
+    snapshot_id: str
+    scores: ComparisonScores
+    found: list[MatchedFinding]  # deterministic findings the agent found
+    missed: list[FindingRef]  # deterministic findings the agent did not find
+    agent_unmatched: list[FindingRef]  # validated agent findings outside the rules
+    agent_rejected: list[FindingRef]  # agent findings that failed validation
+    agent_out_of_scope: list[FindingRef]  # agent findings on excluded infrastructure
+    method: list[str]  # how matching works, for the reader

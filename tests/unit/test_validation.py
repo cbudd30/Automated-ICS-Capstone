@@ -7,32 +7,46 @@ import pytest
 
 from docker_security_agent.schemas.findings import Confidence, FindingStatus
 from docker_security_agent.schemas.observations import ImageScanResult
-from docker_security_agent.schemas.reports import AgentAssessment, PotentialConcern, PrioritizedItem
-from docker_security_agent.security import rules
-from docker_security_agent.security.validation import inspect_path_exists, validate_agent_output
+from docker_security_agent.schemas.reports import AgentAssessment, AgentEvidence, AgentFinding
+from docker_security_agent.security.validation import (
+    inspect_path_exists,
+    validate_agent_output,
+    value_matches,
+)
 from docker_security_agent.security.vulnerability_parser import parse_findings_page
 
 
 @pytest.fixture
-def evidence(snapshot, settings):
-    findings = rules.evaluate(snapshot, settings.rules)
+def scans(snapshot):
     vulns = parse_findings_page(grfics.trivy_findings_page(None, 10))[0]
     image = next(i for i in snapshot.images if i.tags == ["fortiphyd/grfics-plc:latest"])
-    scan = ImageScanResult(
-        image_id=image.id,
-        image_ref=image.tags[0],
-        scanned_at=datetime.now(UTC),
-        vulnerabilities=vulns,
+    return [
+        ImageScanResult(
+            image_id=image.id,
+            image_ref=image.tags[0],
+            scanned_at=datetime.now(UTC),
+            vulnerabilities=vulns,
+        )
+    ]
+
+
+def _finding(resource, *evidence, title="Finding", vulns=(), explanation="x"):
+    return AgentFinding(
+        title=title,
+        resource_name=resource,
+        severity="high",
+        evidence=[AgentEvidence(tool="container_inspect", field=f, value=v) for f, v in evidence],
+        vulnerability_ids=list(vulns),
+        explanation=explanation,
+        remediation="y",
     )
-    return findings, [scan]
 
 
-def _assessment(**overrides):
+def _assessment(*findings, **overrides):
     base = dict(
         executive_summary="Risky.",
         overall_risk="high",
-        prioritized_findings=[],
-        potential_concerns=[],
+        findings=list(findings),
         recommendations=[],
         limitations=[],
     )
@@ -40,175 +54,136 @@ def _assessment(**overrides):
     return AgentAssessment(**base)
 
 
-def test_unknown_finding_ids_are_dropped(snapshot, evidence):
-    findings, scans = evidence
-    real = next(f for f in findings if f.rule_id == "C008")
-    a = _assessment(
-        prioritized_findings=[
-            PrioritizedItem(finding_id="F-FAKE-123", rank=1, rationale="made up"),
-            PrioritizedItem(finding_id=real.id, rank=2, rationale="socket"),
-            PrioritizedItem(finding_id=real.id, rank=3, rationale="duplicate"),
-        ]
-    )
-    out = validate_agent_output(a, findings, snapshot, scans)
-    assert [p.finding_id for p in out.prioritized] == [real.id]
-    assert any("F-FAKE-123" in n for n in out.notes)
-
-
-def test_invented_cves_are_scrubbed_from_text(snapshot, evidence):
-    findings, scans = evidence
+def test_invented_cves_are_scrubbed_from_text(snapshot, scans):
     a = _assessment(
         executive_summary="See CVE-2026-103111 and CVE-1999-0001.",
         recommendations=["Patch CVE-2021-44228 now"],
     )
-    out = validate_agent_output(a, findings, snapshot, scans)
+    out = validate_agent_output(a, snapshot, scans)
     assert "CVE-2026-103111" in out.assessment.executive_summary  # real (from scanner)
     assert "CVE-1999-0001" not in out.assessment.executive_summary
     assert "[unverified CVE removed]" in out.assessment.recommendations[0]
 
 
-def test_potential_concerns_are_grounded_or_rejected(snapshot, evidence):
-    findings, scans = evidence
-    socket = next(f for f in findings if f.rule_id == "C008")
-    good = PotentialConcern(
-        title="Socket + published port on simulation",
-        resource_name="simulation",
-        category="filesystem",
-        severity="critical",
-        explanation="x",
-        remediation="y",
-        evidence_refs=[socket.id, "HostConfig.PortBindings"],
+def test_findings_are_grounded_or_rejected(snapshot, scans):
+    good = _finding(
+        "simulation", ("Mounts.Source", "/var/run/docker.sock"), title="Docker socket mounted"
     )
-    ghost = PotentialConcern(
-        title="Ghost container",
-        resource_name="does-not-exist",
-        category="privilege",
-        severity="high",
-        explanation="x",
-        remediation="y",
-        evidence_refs=[socket.id],
+    ghost = _finding("does-not-exist", ("HostConfig.Privileged", "true"), title="Ghost")
+    fake_cve = _finding(
+        "plc", title="Log4Shell", vulns=["CVE-2021-44228"], explanation="CVE-2021-44228 in plc"
     )
-    fake_cve = PotentialConcern(
-        title="Log4Shell",
-        resource_name="plc",
-        category="image-vulnerability",
-        severity="critical",
-        explanation="CVE-2021-44228 in plc",
-        remediation="y",
-        evidence_refs=["CVE-2021-44228"],
-    )
-    no_evidence = PotentialConcern(
-        title="Vague",
-        resource_name="plc",
-        category="other",
-        severity="low",
-        explanation="x",
-        remediation="y",
-        evidence_refs=["I just feel it"],
-    )
-    out = validate_agent_output(
-        _assessment(potential_concerns=[good, ghost, fake_cve, no_evidence]),
-        findings,
-        snapshot,
-        scans,
-    )
-    assert [c.title for c in out.concerns] == [good.title]
-    assert out.concerns[0].status == FindingStatus.POTENTIAL
-    rejected = {c.title: c for c in out.rejected}
-    assert set(rejected) == {"Ghost container", "Log4Shell", "Vague"}
-    assert all(c.status == FindingStatus.REJECTED for c in out.rejected)
-    assert "not found in the inventory" in rejected["Ghost container"].validation_notes[0]
+    vague = _finding("plc", ("I just feel it", "bad"), title="Vague")
+    out = validate_agent_output(_assessment(good, ghost, fake_cve, vague), snapshot, scans)
+
+    assert [f.title for f in out.findings] == ["Docker socket mounted"]
+    [accepted] = out.findings
+    assert accepted.status == FindingStatus.POTENTIAL and accepted.confidence == Confidence.MEDIUM
+    assert [(e.path, e.value) for e in accepted.evidence] == [
+        ("Mounts.Source", "/var/run/docker.sock")
+    ]
+    rejected = {f.title: f for f in out.rejected}
+    assert set(rejected) == {"Ghost", "Log4Shell", "Vague"}
+    assert all(f.status == FindingStatus.REJECTED for f in out.rejected)
+    assert "not found in the inventory" in rejected["Ghost"].validation_notes[0]
     assert "CVE-2021-44228" in " ".join(rejected["Log4Shell"].validation_notes)
+    assert any("no verifiable evidence" in n for n in rejected["Vague"].validation_notes)
 
 
-def test_rationale_naming_a_different_container_is_flagged(snapshot, evidence):
-    findings, scans = evidence
-    socket = next(f for f in findings if f.rule_id == "C008")  # resource: simulation
-    plc_image = next(
-        f
-        for f in findings
-        if f.rule_id == "I001" and f.resource_name == "fortiphyd/grfics-plc:latest"
-    )
-    a = _assessment(
-        prioritized_findings=[
-            PrioritizedItem(finding_id=socket.id, rank=1, rationale="router forwards traffic"),
-            PrioritizedItem(finding_id=plc_image.id, rank=2, rationale="the plc image floats"),
-            PrioritizedItem(finding_id=socket.id + "x", rank=3, rationale="unknown"),
-        ]
-    )
-    out = validate_agent_output(a, findings, snapshot, scans)
-    flagged = [n for n in out.notes if "talks about" in n]
-    assert len(flagged) == 1 and "router" in flagged[0] and socket.id in flagged[0]
-    # flagged items are kept (the finding itself is real), only annotated
-    assert [p.finding_id for p in out.prioritized] == [socket.id, plc_image.id]
-
-
-def _concern(resource_name, *refs, title="Concern"):
-    return PotentialConcern(
-        title=title,
-        resource_name=resource_name,
-        category="other",
-        severity="medium",
-        explanation="x",
-        remediation="y",
-        evidence_refs=list(refs),
-    )
+def test_cves_must_belong_to_the_resources_image(snapshot, scans):
+    # Trivy reported CVE-2026-103111 for the plc image only.
+    on_plc = _finding("plc", title="pcre2 on plc", vulns=["CVE-2026-103111"])
+    on_image = _finding("fortiphyd/grfics-plc:latest", title="pcre2", vulns=["CVE-2026-103111"])
+    on_router = _finding("router", title="pcre2 on router", vulns=["CVE-2026-103111"])
+    out = validate_agent_output(_assessment(on_plc, on_image, on_router), snapshot, scans)
+    assert [f.title for f in out.findings] == ["pcre2 on plc", "pcre2"]
+    assert out.findings[0].references == ["CVE-2026-103111"]
+    assert [(e.path, e.value) for e in out.findings[0].evidence] == [
+        ("vulnerability", "CVE-2026-103111")
+    ]
+    [wrong] = out.rejected
+    assert "other images, not router" in wrong.validation_notes[0]
 
 
 @pytest.mark.parametrize(
-    "ref",
+    "field",
     [
         "HostConfig.ThisFieldDoesNotExist",  # right section prefix, invented field
         "Config.Totally.Made.Up",
         "RepoTags",  # real image field, but plc is a container
     ],
 )
-def test_inspect_path_must_exist_on_the_named_resource(snapshot, evidence, ref):
-    findings, scans = evidence
-    out = validate_agent_output(
-        _assessment(potential_concerns=[_concern("plc", ref)]), findings, snapshot, scans
-    )
-    assert out.concerns == []
+def test_field_must_exist_on_the_named_resource(snapshot, scans, field):
+    out = validate_agent_output(_assessment(_finding("plc", (field, "x"))), snapshot, scans)
+    assert out.findings == []
     assert out.rejected[0].status == FindingStatus.REJECTED
-    assert "no verifiable evidence reference" in out.rejected[0].validation_notes
 
 
 @pytest.mark.parametrize(
-    ("resource", "ref"),
+    ("resource", "field", "value"),
     [
-        ("plc", "HostConfig.PortBindings"),
-        ("/plc", "Config.Labels.com.docker.compose.service"),  # dotted key
-        ("plc", "Mounts[0].Source"),
-        ("fortiphyd/grfics-plc:latest", "RepoTags"),
-        ("b-ics-net", "IPAM"),
+        ("plc", "HostConfig.PortBindings", "8080"),
+        ("/plc", "Config.Labels.com.docker.compose.service", "plc"),  # dotted key
+        ("plc", "Mounts[0].Source", ""),
+        ("plc", "HostConfig.CapAdd", "NET_ADMIN"),
+        ("fortiphyd/grfics-plc:latest", "RepoTags", "fortiphyd/grfics-plc:latest"),
+        ("b-ics-net", "IPAM", ""),
     ],
 )
-def test_existing_inspect_path_is_accepted(snapshot, evidence, resource, ref):
-    findings, scans = evidence
-    out = validate_agent_output(
-        _assessment(potential_concerns=[_concern(resource, ref)]), findings, snapshot, scans
-    )
-    assert [c.status for c in out.concerns] == [FindingStatus.POTENTIAL]
-    assert out.concerns[0].confidence == Confidence.LOW  # an inspect path is weak evidence
+def test_existing_field_is_accepted(snapshot, scans, resource, field, value):
+    out = validate_agent_output(_assessment(_finding(resource, (field, value))), snapshot, scans)
+    assert [f.status for f in out.findings] == [FindingStatus.POTENTIAL]
+    assert out.findings[0].confidence == Confidence.MEDIUM
     assert out.rejected == []
 
 
-def test_unverified_refs_are_dropped_from_an_accepted_concern(snapshot, evidence):
-    findings, scans = evidence
-    socket = next(f for f in findings if f.rule_id == "C008")  # resource: simulation
+def test_wrong_value_lowers_confidence_but_keeps_the_finding(snapshot, scans):
+    out = validate_agent_output(
+        _assessment(_finding("plc", ("HostConfig.Privileged", "true"))), snapshot, scans
+    )
+    [f] = out.findings  # the field exists; the model paraphrases values, so no rejection
+    assert f.confidence == Confidence.LOW
+    assert f.evidence[0].note == "value differs from the inspect data"
+    assert "some observed values differ from the inspect data" in f.validation_notes
+
+
+def test_unverified_fields_are_dropped_from_an_accepted_finding(snapshot, scans):
     out = validate_agent_output(
         _assessment(
-            potential_concerns=[_concern("simulation", socket.id, "HostConfig.NotARealField")]
+            _finding(
+                "simulation",
+                ("Mounts.Source", "/var/run/docker.sock"),
+                ("HostConfig.NotARealField", "x"),
+            )
         ),
-        findings,
         snapshot,
         scans,
     )
-    [concern] = out.concerns
-    assert [e.value for e in concern.evidence] == [socket.id]
-    assert concern.validation_notes == [
-        "unverified evidence refs ignored: HostConfig.NotARealField"
-    ]
+    [f] = out.findings
+    assert [e.path for e in f.evidence] == ["Mounts.Source"]
+    assert f.validation_notes == ["unverified fields ignored: HostConfig.NotARealField"]
+
+
+def test_infrastructure_and_duplicates_are_set_aside(snapshot, scans):
+    plc = _finding("plc", ("HostConfig.CapAdd", "NET_ADMIN"), title="NET_ADMIN")
+    out = validate_agent_output(
+        _assessment(plc, plc, _finding("router", ("HostConfig.CapAdd", "NET_RAW"), title="Raw")),
+        snapshot,
+        scans,
+        ignored_containers=["rout*"],
+    )
+    assert [f.title for f in out.findings] == ["NET_ADMIN"]
+    assert [f.title for f in out.out_of_scope] == ["Raw"]
+    assert any("reported twice" in n for n in out.notes)
+
+
+def test_value_matches():
+    assert value_matches([["NET_ADMIN", "NET_RAW"]], "NET_RAW")
+    assert value_matches([True], "true")
+    assert value_matches(["/var/run/docker.sock", "/a"], "/var/run/docker.sock")
+    assert value_matches([None], "null") and value_matches([None], "")
+    assert not value_matches([False], "true")
+    assert not value_matches(["/a"], "/var/run/docker.sock")
 
 
 def test_inspect_path_exists():

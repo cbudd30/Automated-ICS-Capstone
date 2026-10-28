@@ -101,9 +101,9 @@ class ModelProfile(BaseModel):
 
 
 class AgentLimits(BaseModel):
-    max_turns: int = 30
-    max_tool_calls: int = 40
-    max_duration_seconds: float = 1200
+    max_turns: int = 60
+    max_tool_calls: int = 100
+    max_duration_seconds: float = 3600
     max_tool_result_chars: int = 12000
 
 
@@ -116,9 +116,6 @@ class AgentConfig(BaseModel):
     limits: AgentLimits = Field(default_factory=AgentLimits)
     session: SessionConfig = Field(default_factory=SessionConfig)
     tracing_enabled: bool = False
-    # False: the first message only summarises the environment and the agent
-    # must gather findings with tools. True: medium+ findings are listed inline.
-    findings_in_prompt: bool = False
 
 
 # ---------------------------------------------------------------------------

@@ -72,6 +72,41 @@ def test_freshness_catches_volume_not_restored(settings, tmp_path):
     assert verify(baseline, after).matches  # without --since only config is compared
 
 
+def test_freshness_can_be_limited_to_the_reset_project(settings, tmp_path):
+    # A reset recreates only the lab's compose project; the proxy and other
+    # projects' volumes on the same engine stay as they were.
+    snap = build_snapshot(settings)
+    for v in snap.volumes:
+        v.labels["com.docker.compose.project"] = "grficsv3"
+    proxy = snap.containers[0].model_copy(
+        update={"name": "docker-audit-socket-proxy", "labels": {}, "compose_project": None}
+    )
+    other = snap.volumes[0].model_copy(update={"name": "other_data", "labels": {}})
+    snap.containers.append(proxy)
+    snap.volumes.append(other)
+    snap.snapshot_id = snap.compute_id()
+    baseline = record_baseline(tmp_path, "clean", snap)
+
+    after = _recreated(snap)
+    old = "2026-10-01T12:00:00Z"
+    next(c for c in after.containers if c.name == proxy.name).created = old
+    next(v for v in after.volumes if v.name == "other_data").created = old
+
+    assert len(verify(baseline, after, since=RESET_AT).differences) == 2
+    result = verify(baseline, after, since=RESET_AT, project="grficsv3")
+    assert result.matches, result.differences
+    assert result.project == "grficsv3"
+
+    stale = next(v for v in after.volumes if v.name == "plc_volume")
+    stale.created = old  # a lab volume that was not restored is still caught
+    assert verify(baseline, after, since=RESET_AT, project="grficsv3").differences == [
+        f"volumes.plc_volume: created {old}, before the reset (contents were not restored)"
+    ]
+    assert verify(baseline, after, since=RESET_AT, project="nope").differences[0] == (
+        "no containers of compose project 'nope' found"
+    )
+
+
 def test_incomplete_inventory_never_matches_or_records(settings, tmp_path):
     snap = build_snapshot(settings)
     baseline = record_baseline(tmp_path, "clean", snap)

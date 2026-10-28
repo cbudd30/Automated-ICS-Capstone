@@ -26,7 +26,7 @@ from docker_security_agent.schemas.observations import (
     ToolCallRecord,
     VulnerabilityRecord,
 )
-from docker_security_agent.schemas.reports import Report
+from docker_security_agent.schemas.reports import AgentReport, Comparison, Report
 
 
 def _now() -> str:
@@ -91,6 +91,8 @@ class AssessmentRepository:
             "errors_json",
             "metrics_json",
             "report_json",
+            "agent_report_json",
+            "comparison_json",
         }
         cols, values = [], []
         for key, value in fields.items():
@@ -136,11 +138,27 @@ class AssessmentRepository:
     def save_report(self, run_id: str, report: Report) -> None:
         self.update_run(run_id, report_json=report.model_dump_json())
 
-    def load_report(self, run_id: str) -> Report | None:
+    def save_agent_report(self, run_id: str, report: AgentReport) -> None:
+        self.update_run(run_id, agent_report_json=report.model_dump_json())
+
+    def save_comparison(self, run_id: str, comparison: Comparison) -> None:
+        self.update_run(run_id, comparison_json=comparison.model_dump_json())
+
+    def _stored(self, run_id: str, column: str) -> str | None:
         run = self.get_run(run_id)
-        if not run or not run.get("report_json"):
-            return None
-        return Report.model_validate_json(run["report_json"])
+        return run.get(column) if run else None
+
+    def load_report(self, run_id: str) -> Report | None:
+        text = self._stored(run_id, "report_json")
+        return Report.model_validate_json(text) if text else None
+
+    def load_agent_report(self, run_id: str) -> AgentReport | None:
+        text = self._stored(run_id, "agent_report_json")
+        return AgentReport.model_validate_json(text) if text else None
+
+    def load_comparison(self, run_id: str) -> Comparison | None:
+        text = self._stored(run_id, "comparison_json")
+        return Comparison.model_validate_json(text) if text else None
 
     # -------------------------------------------------------------- snapshots
 

@@ -4,11 +4,13 @@
 
 name: DockerSecurityAssessmentAgent
 
-# Hard limits so a confused model cannot loop forever.
+# Hard limits so a confused model cannot loop forever. The agent discovers the
+# environment itself with MCP tools (it does not get the deterministic
+# findings), so it needs room to inspect every container and scan images.
 limits:
-  max_turns: 30               # SDK agent-loop turns (one model call per turn)
-  max_tool_calls: 40          # tool calls the agent may make in one run
-  max_duration_seconds: 1200  # wall-clock budget for the agent phase
+  max_turns: 60               # SDK agent-loop turns (one model call per turn)
+  max_tool_calls: 100         # tool calls the agent may make in one run
+  max_duration_seconds: 3600  # wall-clock budget for the agent phase
   max_tool_result_chars: 12000  # tool results longer than this are truncated
                                 # before they reach the model
 
@@ -17,14 +19,6 @@ limits:
 # `assess` to continue a named conversation across executions.
 session:
   db_path: data/agent_sessions.db
-
-# What the first message contains:
-#   false (default) - only an environment summary + finding counts; the agent
-#                     must call tools (get_rule_findings, container_inspect...)
-#                     to gather evidence. Makes tool-use comparable across models.
-#   true            - medium+ findings are listed inline (fewer tool calls,
-#                     helpful for weak models with poor tool calling).
-findings_in_prompt: false
 
 # The SDK can upload traces to the OpenAI dashboard. That would send Docker
 # metadata to OpenAI even when running a local model, so it is OFF by default.

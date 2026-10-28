@@ -112,7 +112,7 @@ def test_save_then_reset(env):
         ),
         next(i for i, x in enumerate(c) if "-xzf /from/grficsv3_plc_volume.tar.gz" in x),
         next(i for i, x in enumerate(c) if "up -d --no-build --pull never" in x),
-        c.index("AUDIT range verify base1 --since 2026-10-16T10:00:00Z"),
+        c.index("AUDIT range verify base1 --since 2026-10-16T10:00:00Z --project grficsv3"),
     ]
     assert steps == sorted(steps)
     assert all(" -p grficsv3 " in x for x in c if " compose " in x)

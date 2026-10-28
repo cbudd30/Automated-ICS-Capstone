@@ -1,30 +1,33 @@
 """Validate the LLM's structured output against the collected evidence.
 
-LLMs - especially small local ones - can hallucinate CVE IDs, refer to
-containers that do not exist, or "prioritise" finding IDs they made up. The
-report must only contain evidence-grounded statements, so the agent's
-``AgentAssessment`` is checked here before it is used:
+The agent investigates with MCP tools only and reports its own findings. It
+never sees the deterministic results, but its claims are still checked
+against the evidence the application collected (inventory snapshot + Trivy
+scans) before anything reaches a report. LLMs - especially small local ones -
+can hallucinate CVE IDs, refer to containers that do not exist, or cite
+fields that are not there:
 
-* **Prioritised findings** must reference an existing confirmed finding ID.
-  Unknown IDs are dropped (and noted).
-* **Potential concerns** (new issues the model proposes) must
+* **Every finding** must
     - name a resource that exists in the inventory snapshot,
-    - cite at least one verifiable evidence reference (a finding ID, a CVE
-      from the scanner output, a resource name, or a docker-inspect field
-      path that is present in the named resource's stored inspect data), and
-    - not mention any CVE that Trivy did not report.
-  Concerns that fail are kept in the report under "rejected agent claims"
-  (transparency for model comparison) but never treated as findings.
+    - cite at least one verifiable piece of evidence: a field path present in
+      that resource's inspect data, or a vulnerability ID that Trivy reported
+      for that resource's image, and
+    - not mention any CVE that Trivy did not report for that image.
+  Findings that fail are kept in the agent report under "rejected" (for
+  model comparison) but never treated as findings. Findings on assessment
+  infrastructure excluded by configuration (the read-only proxy) are set
+  aside as out of scope.
+* **Observed values** are compared with the stored inspect data. A mismatch
+  does not reject the finding (models paraphrase values), but lowers its
+  confidence and is noted.
 * **Free text** (summary, recommendations, limitations): CVE IDs that are not
   in the scanner output are replaced with ``[unverified CVE removed]``.
-* **Rationale consistency**: if a prioritisation rationale names containers
-  but none of them is the finding's resource (or a container using the
-  finding's image), the item is kept but flagged - small models sometimes
-  attach the right text to the wrong finding ID.
 """
 
 from __future__ import annotations
 
+import fnmatch
+import json
 import re
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,7 +43,7 @@ from docker_security_agent.schemas.findings import (
     Severity,
 )
 from docker_security_agent.schemas.observations import ImageScanResult
-from docker_security_agent.schemas.reports import AgentAssessment, PrioritizedItem
+from docker_security_agent.schemas.reports import AgentAssessment, AgentFinding
 from docker_security_agent.security.findings import finding_id
 
 VULN_ID_RE = re.compile(r"\b(CVE-\d{4}-\d{4,}|GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4})\b", re.I)
@@ -50,9 +53,9 @@ _INDEX_RE = re.compile(r"\[(\d+)\]")
 @dataclass
 class ValidationOutcome:
     assessment: AgentAssessment  # with unverified CVEs scrubbed from free text
-    prioritized: list[PrioritizedItem] = field(default_factory=list)
-    concerns: list[Finding] = field(default_factory=list)
+    findings: list[Finding] = field(default_factory=list)  # validated, agent's order
     rejected: list[Finding] = field(default_factory=list)
+    out_of_scope: list[Finding] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
 
@@ -68,28 +71,6 @@ def _scrub_unknown_cves(text: str, known: set[str], notes: list[str], where: str
         return "[unverified CVE removed]"
 
     return VULN_ID_RE.sub(replace, text)
-
-
-def _rationale_mismatch(text: str, finding: Finding, snapshot: InventorySnapshot) -> list[str]:
-    """Container names mentioned in ``text`` when none of them matches ``finding``.
-
-    Returns [] when the rationale mentions no container, or mentions a
-    container that is the finding's resource / runs the finding's image.
-    """
-    mentioned = {
-        c.name
-        for c in snapshot.containers
-        if re.search(rf"(?<![\w-]){re.escape(c.name)}(?![\w-])", text)
-    }
-    if not mentioned:
-        return []
-    allowed = {finding.resource_name}
-    if finding.resource_type == "image":
-        image_ids = {
-            i.id for i in snapshot.images if finding.resource_name in (i.display_name, *i.tags)
-        }
-        allowed |= {c.name for c in snapshot.containers if c.image_id in image_ids}
-    return [] if mentioned & allowed else sorted(mentioned)
 
 
 def _inspect_docs(snapshot: InventorySnapshot, resource_name: str) -> list[dict]:
@@ -112,51 +93,124 @@ def _inspect_docs(snapshot: InventorySnapshot, resource_name: str) -> list[dict]
     return docs
 
 
-def _path_exists(node: Any, parts: list[str]) -> bool:
+def image_ids_for(snapshot: InventorySnapshot, resource_name: str) -> set[str]:
+    """Image IDs a resource name refers to: the image itself, or a container's image."""
+    name = resource_name.strip().lstrip("/").lower()
+    ids = {
+        i.id
+        for i in snapshot.images
+        if name in {n.lower() for n in (i.id, i.display_name, *i.tags, *i.digests)}
+        or name == i.id.removeprefix("sha256:")[:12].lower()
+    }
+    ids |= {
+        c.image_id
+        for c in snapshot.containers
+        if name in {c.name.lower(), c.id.lower(), c.id[:12].lower()}
+    }
+    return ids
+
+
+def _values_at(node: Any, parts: list[str]) -> list[Any]:
+    """Every value found at the dotted path ``parts`` below ``node``."""
     if not parts:
-        return True
+        return [node]
     if isinstance(node, dict):
         # Keys may contain dots themselves (labels such as com.docker.compose.project,
         # network names), so try every split, longest key first.
         for n in range(len(parts), 0, -1):
             key = ".".join(parts[:n])
-            if key in node and _path_exists(node[key], parts[n:]):
-                return True
-        return False
+            if key in node:
+                found = _values_at(node[key], parts[n:])
+                if found:
+                    return found
+        return []
     if isinstance(node, list):
         if parts[0].isdigit():
             i = int(parts[0])
-            return i < len(node) and _path_exists(node[i], parts[1:])
-        # No index (e.g. Mounts.Source): the path holds if any element has it.
-        return any(_path_exists(item, parts) for item in node)
-    return False
+            return _values_at(node[i], parts[1:]) if i < len(node) else []
+        # No index (e.g. Mounts.Source): collect the path from every element.
+        return [v for item in node for v in _values_at(item, parts)]
+    return []
+
+
+def _split_path(path: str) -> list[str]:
+    path = _INDEX_RE.sub(r".\1", path.strip()).lstrip(".")
+    return path.split(".") if path else []
+
+
+def inspect_values(doc: dict, path: str) -> list[Any]:
+    """Values at dotted ``path`` (e.g. ``HostConfig.CapAdd``, ``Mounts[0].Source``)."""
+    parts = _split_path(path)
+    return _values_at(doc, parts) if parts else []
 
 
 def inspect_path_exists(doc: dict, path: str) -> bool:
-    """True if dotted ``path`` (e.g. ``HostConfig.CapAdd``, ``Mounts[0].Source``)
-    is present in the inspect document ``doc``. Only key presence is checked,
-    not whether the value supports the claim."""
-    path = _INDEX_RE.sub(r".\1", path.strip()).lstrip(".")
-    return bool(path) and _path_exists(doc, path.split("."))
+    """True if dotted ``path`` is present in the inspect document ``doc``."""
+    parts = _split_path(path)
+    return bool(parts) and bool(_values_at(doc, parts))
 
 
-def _category(value: str) -> Category:
-    try:
-        return Category(value.strip().lower())
-    except ValueError:
-        return Category.OTHER
+def _compact(value: Any) -> str:
+    text = value if isinstance(value, str) else json.dumps(value)
+    return re.sub(r"[\s\"'\[\]{}]", "", text).lower()
+
+
+def value_matches(actual: list[Any], claimed: str) -> bool:
+    """Loose check that the claimed value is what the inspect data holds.
+
+    Containment either way after removing quotes, brackets and spaces, so
+    ``NET_ADMIN`` matches ``["NET_ADMIN"]`` and ``true`` matches ``True``.
+    An empty claim always matches.
+    """
+    want = _compact(claimed)
+    if not want:
+        return True
+    for value in actual:
+        have = _compact(value)
+        if have in ("", "null", "none") and want in ("", "null", "none", "empty", "<empty>"):
+            return True
+        if have and (want in have or have in want):
+            return True
+    return False
+
+
+def _to_finding(
+    f: AgentFinding,
+    *,
+    status: FindingStatus,
+    confidence: Confidence,
+    evidence: list[Evidence],
+    notes: list[str],
+) -> Finding:
+    return Finding(
+        id=finding_id("AGENT", f.resource_name, f.title),
+        rule_id="AGENT",
+        title=f.title,
+        resource_type="unknown",
+        resource_name=f.resource_name.lstrip("/"),
+        category=Category.OTHER,
+        severity=Severity(f.severity),
+        confidence=confidence,
+        status=status,
+        source=FindingSource.AGENT,
+        evidence=evidence,
+        explanation=f.explanation,
+        remediation=f.remediation,
+        references=sorted({v.strip().upper() for v in f.vulnerability_ids if v.strip()}),
+        validation_notes=notes,
+    )
 
 
 def validate_agent_output(
     assessment: AgentAssessment,
-    findings: list[Finding],
     snapshot: InventorySnapshot,
     scans: list[ImageScanResult],
+    ignored_containers: list[str] | None = None,
 ) -> ValidationOutcome:
-    known_findings = {f.id for f in findings}
-    by_id = {f.id: f for f in findings}
     known_vulns = _known_vuln_ids(scans)
+    vulns_by_image = {s.image_id: {v.vuln_id.upper() for v in s.vulnerabilities} for s in scans}
     resources = {r.lower() for r in snapshot.resource_names()}
+    ignored = ignored_containers or []
     notes: list[str] = []
 
     # ---- free text: remove invented CVE IDs
@@ -173,92 +227,99 @@ def validate_agent_output(
     ]
 
     outcome = ValidationOutcome(assessment=cleaned, notes=notes)
-
-    # ---- prioritised findings must exist
     seen: set[str] = set()
-    for item in sorted(assessment.prioritized_findings, key=lambda p: p.rank):
-        if item.finding_id not in known_findings:
-            notes.append(f"prioritized_findings: unknown finding id '{item.finding_id}' dropped")
-            continue
-        if item.finding_id in seen:
-            continue
-        seen.add(item.finding_id)
-        item = item.model_copy()
-        item.rationale = _scrub_unknown_cves(item.rationale, known_vulns, notes, "rationale")
-        mismatch = _rationale_mismatch(item.rationale, by_id[item.finding_id], snapshot)
-        if mismatch:
-            notes.append(
-                f"prioritized_findings: rationale for {item.finding_id} "
-                f"({by_id[item.finding_id].resource_name}) talks about {', '.join(mismatch)}"
-            )
-        outcome.prioritized.append(item)
 
-    # ---- potential concerns must be grounded
-    for concern in assessment.potential_concerns:
+    for f in assessment.findings:
+        name = f.resource_name.strip().lstrip("/")
         problems: list[str] = []
-        resource_ok = concern.resource_name.lstrip("/").lower() in resources
-        if not resource_ok:
-            problems.append(f"resource '{concern.resource_name}' not found in the inventory")
+        finding_notes: list[str] = []
 
-        text = " ".join(
-            [concern.title, concern.explanation, concern.remediation, *concern.evidence_refs]
-        )
-        unknown_cves = sorted({m.upper() for m in VULN_ID_RE.findall(text)} - known_vulns)
-        if unknown_cves:
-            problems.append(f"cites CVEs not in scanner output: {', '.join(unknown_cves)}")
+        if name.lower() not in resources:
+            problems.append(f"resource '{f.resource_name}' not found in the inventory")
 
-        # Inspect paths must exist on the named resource itself, not just look plausible.
-        docs = _inspect_docs(snapshot, concern.resource_name)
-        valid_refs = []
-        unverified_refs = []
-        for ref in concern.evidence_refs:
-            r = ref.strip()
-            if (
-                r in known_findings
-                or r.upper() in known_vulns
-                or r.lstrip("/").lower() in resources
-                or any(inspect_path_exists(d, r) for d in docs)
-            ):
-                valid_refs.append(r)
-            else:
-                unverified_refs.append(r)
-        if not valid_refs:
-            problems.append("no verifiable evidence reference")
-
-        strong = any(r in known_findings or r.upper() in known_vulns for r in valid_refs)
-        # A rejected concern keeps every ref (what the model claimed); an accepted
-        # one only carries the refs that checked out, the rest are noted.
-        evidence_refs = concern.evidence_refs if problems else valid_refs
-        notes_for_finding = list(problems)
-        if not problems and unverified_refs:
-            notes_for_finding.append(
-                f"unverified evidence refs ignored: {', '.join(unverified_refs)}"
+        # CVEs must be ones Trivy reported, and for this resource's image.
+        image_vulns: set[str] = set()
+        for image_id in image_ids_for(snapshot, name):
+            image_vulns |= vulns_by_image.get(image_id, set())
+        text = " ".join([f.title, f.explanation, f.remediation, *f.vulnerability_ids])
+        cited = {m.upper() for m in VULN_ID_RE.findall(text)}
+        unknown = sorted(cited - known_vulns)
+        if unknown:
+            problems.append(f"cites CVEs not in scanner output: {', '.join(unknown)}")
+        elsewhere = sorted((cited & known_vulns) - image_vulns)
+        if elsewhere:
+            problems.append(
+                f"cites CVEs Trivy reported for other images, not {name}: {', '.join(elsewhere)}"
             )
-        finding = Finding(
-            id=finding_id("AGENT", concern.resource_name, concern.title),
-            rule_id="AGENT",
-            title=concern.title,
-            resource_type="unknown",
-            resource_name=concern.resource_name,
-            category=_category(concern.category),
-            severity=Severity(concern.severity),
-            confidence=Confidence.MEDIUM if strong else Confidence.LOW,
-            status=FindingStatus.REJECTED if problems else FindingStatus.POTENTIAL,
-            source=FindingSource.AGENT,
-            evidence=[
+        valid_vulns = sorted(cited & image_vulns)
+
+        # Field paths must exist on the named resource itself, not just look plausible.
+        docs = _inspect_docs(snapshot, name)
+        verified: list[Evidence] = []
+        values_ok = True
+        unverified: list[str] = []
+        for e in f.evidence:
+            values = [v for d in docs for v in inspect_values(d, e.field)]
+            if not values:
+                unverified.append(e.field)
+                continue
+            matches = value_matches(values, e.value)
+            values_ok &= matches
+            verified.append(
                 Evidence(
-                    source="agent", resource=concern.resource_name, path="evidence_ref", value=r
+                    source=f"agent:{e.tool}",
+                    resource=name,
+                    path=e.field.strip(),
+                    value=e.value,
+                    note="" if matches else "value differs from the inspect data",
                 )
-                for r in evidence_refs
-            ],
-            explanation=concern.explanation,
-            remediation=concern.remediation,
-            validation_notes=notes_for_finding,
-        )
+            )
+        verified += [
+            Evidence(source="agent:trivy", resource=name, path="vulnerability", value=v)
+            for v in valid_vulns
+        ]
+        if not verified:
+            problems.append("no verifiable evidence (no matching field or vulnerability ID)")
+        if unverified:
+            finding_notes.append(f"unverified fields ignored: {', '.join(unverified)}")
+        if not values_ok:
+            finding_notes.append("some observed values differ from the inspect data")
+
+        key = finding_id("AGENT", name, f.title)
+        if key in seen:
+            notes.append(f"finding '{f.title}' on {name} reported twice; duplicate dropped")
+            continue
+        seen.add(key)
+
         if problems:
-            outcome.rejected.append(finding)
-            notes.append(f"potential concern '{concern.title}' rejected: {'; '.join(problems)}")
+            outcome.rejected.append(
+                _to_finding(
+                    f,
+                    status=FindingStatus.REJECTED,
+                    confidence=Confidence.LOW,
+                    evidence=[
+                        Evidence(
+                            source=f"agent:{e.tool}", resource=name, path=e.field, value=e.value
+                        )
+                        for e in f.evidence
+                    ],
+                    notes=problems + finding_notes,
+                )
+            )
+            notes.append(f"finding '{f.title}' rejected: {'; '.join(problems)}")
+            continue
+
+        finding = _to_finding(
+            f,
+            status=FindingStatus.POTENTIAL,
+            confidence=Confidence.MEDIUM if values_ok else Confidence.LOW,
+            evidence=verified,
+            notes=finding_notes,
+        )
+        if any(fnmatch.fnmatchcase(name, p) for p in ignored):
+            finding.validation_notes.append("assessment infrastructure, excluded by configuration")
+            outcome.out_of_scope.append(finding)
         else:
-            outcome.concerns.append(finding)
+            outcome.findings.append(finding)
 
     return outcome

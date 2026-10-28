@@ -77,7 +77,7 @@ async def test_deterministic_assessment_is_read_only(live_settings):
     assert report.findings, "expected at least one finding on a real host"
     assert {s.name for s in report.mcp_servers if s.connected} == {"docker", "trivy"}
     assert len(report.vulnerabilities) <= 1
-    assert result.json_path.exists() and result.md_path.exists()
+    assert result.md_path.exists() and result.md_path.with_suffix(".json").exists()
     repo = AssessmentRepository(settings.assessment_db_path)
     assert repo.get_run(result.run_id)["status"] == result.status
     assert repo.load_tool_calls(result.run_id)

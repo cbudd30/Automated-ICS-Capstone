@@ -16,11 +16,12 @@ High-level map of the package (read in this order to understand the flow):
 
     inventory/              Turn raw `docker inspect` JSON into typed assets.
     security/               Deterministic rules, Trivy parsing, scan orchestration,
-                            and validation of the LLM's output.
+                            validation of the LLM's output, and the agent-vs-rules
+                            comparison.
     llm/                    Model factory (OpenAI / Ollama / vLLM) + capability checks.
     agents/                 The single DockerSecurityAssessmentAgent.
     memory/                 SQLite: agent sessions + structured assessment store.
-    reporting/              report.json + report.md generation.
+    reporting/              agent, deterministic and comparison reports (.json + .md).
     schemas/                Pydantic data models shared by all of the above.
 """
 
@@ -33,4 +34,7 @@ __version__ = "0.1.0"
 #        assessment-infrastructure containers labelled in evidence tools
 #   v3 - evidence tools take optional arguments and return real error messages;
 #        no example finding ID in the output schema
-PROMPT_VERSION = "v3"
+#   v4 - MCP tools only (no evidence tools, no deterministic findings); the first
+#        message is the objective + out-of-scope containers; the agent reports its
+#        own findings with tool/field/value evidence
+PROMPT_VERSION = "v4"

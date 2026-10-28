@@ -11,8 +11,8 @@ Commands
   inventory            collect and print a Docker inventory snapshot (read-only)
   assess               run a full assessment (see pipeline.py)
   runs                 list previous runs
-  snapshots            list stored inventory snapshots (for --snapshot replay)
-  report --run-id ID   print a stored report (markdown or JSON)
+  snapshots            list stored inventory snapshots (for --no-agent --snapshot replay)
+  report --run-id ID   print a stored report: --kind comparison | agent | deterministic
 
 Every command loads configuration first; config errors are shown as a clean
 message instead of a traceback.
@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -385,10 +385,7 @@ def mcp_tools() -> None:
     console.print(table)
     for name, err in errors.items():
         console.print(f"[red]{name} unavailable:[/red] {err}")
-    console.print(
-        "Plus local evidence tools: get_inventory_overview, get_rule_findings, "
-        "get_container_details, get_image_vulnerabilities"
-    )
+    console.print("These MCP tools are the agent's only tools.")
 
 
 # ---------------------------------------------------------------------------
@@ -475,7 +472,9 @@ def _security_warning(message: str) -> None:
 @app.command()
 def assess(
     model: Annotated[str | None, typer.Option(help="Model profile from config/models.yaml")] = None,
-    snapshot: Annotated[str | None, typer.Option(help="Replay a stored snapshot ID")] = None,
+    snapshot: Annotated[
+        str | None, typer.Option(help="With --no-agent: re-run the rules on a stored snapshot ID")
+    ] = None,
     no_agent: Annotated[bool, typer.Option("--no-agent", help="Rules + scanner only")] = False,
     no_scan: Annotated[bool, typer.Option("--no-scan", help="Skip Trivy image scans")] = False,
     session: Annotated[str | None, typer.Option(help="Continue a named agent session")] = None,
@@ -484,8 +483,10 @@ def assess(
     manifest: Annotated[
         str | None,
         typer.Option(
-            help="Re-run a manifest (file path or run ID) on its pinned evidence. "
-            "Cannot be combined with --model/--snapshot/--no-agent/--session/--objective."
+            help="Re-run a manifest (file path or run ID) with its configuration: "
+            "deterministic runs on their pinned evidence, agent runs live (against the "
+            "same range baseline). Cannot be combined with "
+            "--model/--snapshot/--no-agent/--session/--objective."
         ),
     ] = None,
     allow_drift: Annotated[
@@ -499,7 +500,8 @@ def assess(
         ),
     ] = None,
 ) -> None:
-    """Run a full defensive assessment and write outputs/<RUN_ID>/report.{json,md}."""
+    """Run an assessment; write the deterministic report, and with an agent also the
+    agent report and the comparison, to outputs/<RUN_ID>/."""
     from docker_security_agent.pipeline import (
         AssessmentAborted,
         AssessOptions,
@@ -538,15 +540,29 @@ def assess(
     s = result.report.summary
     console.print()
     console.print(
-        f"[bold]Run {result.run_id}[/bold]: {result.status} — overall risk "
-        f"[bold]{s.overall_risk.upper()}[/bold] ({s.risk_source})"
+        f"[bold]Run {result.run_id}[/bold]: {result.status} — deterministic risk "
+        f"[bold]{s.overall_risk.upper()}[/bold]"
     )
-    console.print("Findings: " + ", ".join(f"{k} {v}" for k, v in s.findings_by_severity.items()))
     console.print(
-        f"Potential concerns: {len(result.report.potential_concerns)} · rejected "
-        f"agent claims: {len(result.report.rejected_agent_claims)}"
+        "Deterministic findings: "
+        + ", ".join(f"{k} {v}" for k, v in s.findings_by_severity.items())
     )
-    console.print(f"Report: {result.md_path}\n        {result.json_path}")
+    if result.agent_report and result.comparison:
+        a, sc = result.agent_report, result.comparison.scores
+        console.print(
+            f"Agent ({a.agent_status}): {len(a.findings)} findings, {len(a.rejected)} rejected"
+            + (f" · agent risk {a.overall_risk.upper()}" if a.overall_risk else "")
+        )
+        console.print(
+            f"Comparison: found {sc.found}/{sc.deterministic_total} deterministic findings "
+            f"(recall {sc.recall:.0%}, weighted {sc.weighted_recall:.0%}) · missed {sc.missed}"
+            f" · outside the rules {sc.agent_unmatched}"
+        )
+    console.print(f"Deterministic report: {result.md_path}")
+    if result.agent_md_path:
+        console.print(f"Agent report:         {result.agent_md_path}")
+    if result.comparison_md_path:
+        console.print(f"Comparison:           {result.comparison_md_path}")
     if result.manifest_path:
         console.print(
             f"Manifest: {result.manifest_path}\n          sha256 {result.report.manifest_sha256}"
@@ -596,6 +612,10 @@ def range_verify(
         str | None,
         typer.Option(help="ISO time the reset started: every container and volume must be newer"),
     ] = None,
+    project: Annotated[
+        str | None,
+        typer.Option(help="Limit the --since check to this compose project (what was reset)"),
+    ] = None,
 ) -> None:
     """Check that the live range matches baseline NAME (exit code 1 if not)."""
     from datetime import UTC, datetime
@@ -612,12 +632,13 @@ def range_verify(
     if since_dt is not None and since_dt.tzinfo is None:
         since_dt = since_dt.replace(tzinfo=UTC)
     snap, _ = _collect_snapshot(settings)
-    result = verify(baseline, snap, since=since_dt)
+    result = verify(baseline, snap, since=since_dt, project=project)
     path = save_verification(settings.data_dir, result)
     if result.matches:
+        scope = f"{project}'s containers and volumes" if project else "all containers and volumes"
         console.print(
             f"[green]Range matches baseline {name}[/green] (snapshot {snap.snapshot_id}"
-            + (", all containers and volumes recreated by the reset" if since_dt else "")
+            + (f", {scope} recreated by the reset" if since_dt else "")
             + f") · {path}"
         )
         return
@@ -714,20 +735,40 @@ def snapshots(limit: int = 20) -> None:
 @app.command()
 def report(
     run_id: Annotated[str, typer.Option("--run-id", help="Run ID from `docker-audit runs`")],
+    kind: Annotated[
+        str, typer.Option(help="comparison | agent | deterministic (default: comparison)")
+    ] = "comparison",
     fmt: Annotated[str, typer.Option("--format", help="md | json | path")] = "md",
     raw: Annotated[bool, typer.Option(help="Print markdown source instead of rendering")] = False,
 ) -> None:
     """Print a stored report (re-rendered from the JSON stored in SQLite)."""
-    from docker_security_agent.memory.repository import AssessmentRepository
-    from docker_security_agent.reporting.generator import render_markdown
+    import json
 
+    from docker_security_agent.memory.repository import AssessmentRepository
+    from docker_security_agent.reporting.agent_report import render_agent_markdown
+    from docker_security_agent.reporting.comparison_report import render_comparison_markdown
+    from docker_security_agent.reporting.generator import render_markdown
+    from docker_security_agent.schemas.reports import MCPServerInfo
+
+    if kind not in ("comparison", "agent", "deterministic"):
+        console.print("[red]--kind must be comparison, agent or deterministic[/red]")
+        raise typer.Exit(2)
     settings = _settings()
     repo = AssessmentRepository(settings.assessment_db_path)
-    stored = repo.load_report(run_id)
     run = repo.get_run(run_id)
+    stored: Any = {
+        "comparison": repo.load_comparison,
+        "agent": repo.load_agent_report,
+        "deterministic": repo.load_report,
+    }[kind](run_id)
     repo.close()
     if stored is None:
-        msg = "run not found" if run is None else f"run has no report (status: {run['status']})"
+        if run is None:
+            msg = "run not found"
+        elif kind != "deterministic" and not run.get("model_profile"):
+            msg = f"deterministic run: no {kind} report (use --kind deterministic)"
+        else:
+            msg = f"run has no {kind} report (status: {run['status']})"
         console.print(f"[red]{run_id}: {msg}[/red]")
         raise typer.Exit(1)
     if fmt == "json":
@@ -735,7 +776,13 @@ def report(
     elif fmt == "path":
         console.print(str(settings.output_dir / run_id))
     else:
-        md = render_markdown(stored)
+        if kind == "comparison":
+            md = render_comparison_markdown(stored)
+        elif kind == "agent":
+            servers = [MCPServerInfo(**s) for s in json.loads(run.get("mcp_servers_json") or "[]")]
+            md = render_agent_markdown(stored, servers)
+        else:
+            md = render_markdown(stored)
         if raw:
             sys.stdout.write(md)
         else:

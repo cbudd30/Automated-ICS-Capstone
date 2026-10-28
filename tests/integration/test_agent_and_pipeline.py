@@ -3,8 +3,8 @@
 The OpenAI Agents SDK ships ``agents.testing.ScriptedModel``: a deterministic
 ``Model`` that returns pre-defined outputs (tool calls, then a final message).
 Using it, these tests run the REAL SDK agent loop, REAL MCP subprocesses (the
-fake servers), the real evidence tools, validation, SQLite and reporting -
-with no LLM, no Docker and no paid API.
+fake servers), validation, the comparison, SQLite and reporting - with no LLM,
+no Docker and no paid API.
 """
 
 import json
@@ -14,12 +14,7 @@ from agents import ModelSettings, SQLiteSession
 from agents.testing import ScriptedModel, assistant_message, function_call
 from builders import build_snapshot
 
-from docker_security_agent.agents.security_assessment import (
-    EvidenceStore,
-    build_agent,
-    build_evidence_tools,
-    run_agent,
-)
+from docker_security_agent.agents.security_assessment import build_agent, build_input, run_agent
 from docker_security_agent.config import ConfigError, ModelProfile
 from docker_security_agent.llm.factory import ModelBundle
 from docker_security_agent.mcp.policy import ToolPolicy
@@ -28,7 +23,6 @@ from docker_security_agent.mcp.redaction import Redactor
 from docker_security_agent.mcp.registry import DockerEndpointStatus, build_servers, connect
 from docker_security_agent.memory.repository import AssessmentRepository
 from docker_security_agent.pipeline import AssessOptions, options_from_manifest, run_assessment
-from docker_security_agent.security import rules
 
 pytestmark = pytest.mark.integration
 
@@ -45,67 +39,74 @@ def _bundle(model) -> ModelBundle:
     return ModelBundle(model=model, settings=ModelSettings(), profile=profile)
 
 
-def _final_json(finding_id: str, concern_resource: str = "router") -> str:
+def _finding(resource, title, field, value, *, severity="high", tool="container_inspect", vulns=()):
+    return {
+        "title": title,
+        "resource_name": resource,
+        "severity": severity,
+        "evidence": [{"tool": tool, "field": field, "value": value}] if field else [],
+        "vulnerability_ids": list(vulns),
+        "explanation": "pivot into the process network",
+        "remediation": "fix it",
+    }
+
+
+def _final_json(*findings) -> str:
     return json.dumps(
         {
             "executive_summary": "Docker socket on simulation gives host control; CVE-2026-103111.",
             "overall_risk": "critical",
-            "prioritized_findings": [
-                {"finding_id": finding_id, "rank": 1, "rationale": "simulation controls the host"},
-                {"finding_id": "F-MADE-UP", "rank": 2, "rationale": "hallucinated"},
-            ],
-            "potential_concerns": [
-                {
-                    "title": "Router bridges DMZ and ICS with NET_RAW",
-                    "resource_name": concern_resource,
-                    "category": "network-segmentation",
-                    "severity": "high",
-                    "explanation": "pivot",
-                    "remediation": "split",
-                    "evidence_refs": ["HostConfig.CapAdd"],
-                }
-            ],
+            "findings": list(findings),
             "recommendations": ["Remove the docker.sock mount from simulation"],
             "limitations": ["Scripted model"],
         }
     )
 
 
-async def test_agent_uses_evidence_and_mcp_tools(fake_mcp_settings, tmp_path):
-    settings = fake_mcp_settings
-    snap = build_snapshot(settings)
-    findings = rules.evaluate(snap, settings.rules)
-    socket_id = next(f.id for f in findings if f.rule_id == "C008")
+SOCKET = _finding(
+    "simulation",
+    "Docker socket mounted",
+    "Mounts.Source",
+    "/var/run/docker.sock",
+    severity="critical",
+)
+ROUTER_CAPS = _finding("router", "Router has NET_RAW", "HostConfig.CapAdd", "NET_RAW")
+SIM_CVE = _finding(
+    "simulation",
+    "Vulnerable pcre2",
+    "",
+    "",
+    severity="medium",
+    tool="findings_list",
+    vulns=["CVE-2026-103111"],
+)
+GHOST = _finding("ghost-container", "Invented", "HostConfig.Privileged", "true")
 
+
+def _mcp_servers(settings, recorder, roles=("docker_inspection",)):
+    policy = ToolPolicy(settings.mcp)
+    return build_servers(
+        settings, policy, Redactor(settings.mcp.redaction), recorder, roles=set(roles)
+    )
+
+
+async def test_agent_uses_only_mcp_tools(fake_mcp_settings, tmp_path):
+    settings = fake_mcp_settings
     model = ScriptedModel(
         [
-            [
-                function_call(
-                    "get_rule_findings",
-                    {"min_severity": "critical", "resource_name": ""},
-                    call_id="c1",
-                )
-            ],
+            [function_call("container_list", {"all": True}, call_id="c1")],
             [function_call("container_inspect", {"id_or_name": "router"}, call_id="c2")],
-            [assistant_message(_final_json(socket_id))],
+            [assistant_message(_final_json(ROUTER_CAPS))],
         ]
     )
     recorder = ToolCallRecorder(10)
-    policy = ToolPolicy(settings.mcp)
-    servers = build_servers(
-        settings, policy, Redactor(settings.mcp.redaction), recorder, roles={"docker_inspection"}
-    )
     session = SQLiteSession("t1", tmp_path / "s.db")
-    async with connect(servers) as manager:
-        store = EvidenceStore(snapshot=snap, findings=findings, scans=[])
-        agent = build_agent(
-            _bundle(model),
-            mcp_servers=manager.active_servers,
-            evidence_tools=build_evidence_tools(store, recorder),
-        )
+    async with connect(_mcp_servers(settings, recorder)) as manager:
+        agent = build_agent(_bundle(model), mcp_servers=manager.active_servers)
+        assert agent.tools == []  # no function tools: no access to deterministic results
         outcome = await run_agent(
             agent,
-            "assess",
+            build_input("assess", ["docker-audit-socket-proxy"]),
             max_turns=10,
             timeout_seconds=60,
             session=session,
@@ -114,11 +115,15 @@ async def test_agent_uses_evidence_and_mcp_tools(fake_mcp_settings, tmp_path):
         )
 
     assert outcome.status == "ok", outcome.error
-    assert outcome.assessment.prioritized_findings[0].finding_id == socket_id
+    assert outcome.assessment.findings[0].resource_name == "router"
     assert [(r.server, r.tool) for r in recorder.records] == [
-        ("local", "get_rule_findings"),
+        ("docker", "container_list"),
         ("docker", "container_inspect"),
     ]
+    # The first message holds no inventory and no findings.
+    first = str(model.calls[0].input)
+    assert "OUT OF SCOPE: docker-audit-socket-proxy" in first
+    assert "finding" not in first.lower() and "simulation" not in first
     # The model saw redacted data only.
     tool_output = str(model.calls[2].input)
     assert "FWUI_SECRET_KEY=<redacted>" in tool_output
@@ -127,38 +132,28 @@ async def test_agent_uses_evidence_and_mcp_tools(fake_mcp_settings, tmp_path):
     assert len(await session.get_items()) >= 5
 
 
-async def test_tool_budget_and_turn_limit(settings):
-    snap = build_snapshot(settings)
-    store = EvidenceStore(snapshot=snap, findings=[], scans=[])
+async def test_tool_budget_and_turn_limit(fake_mcp_settings):
     recorder = ToolCallRecorder(max_agent_calls=1)
-    loop = [[function_call("get_inventory_overview", {}, call_id=f"c{i}")] for i in range(5)]
-    agent = build_agent(
-        _bundle(ScriptedModel(loop)),
-        mcp_servers=[],
-        evidence_tools=build_evidence_tools(store, recorder),
-    )
-    outcome = await run_agent(
-        agent,
-        "x",
-        max_turns=3,
-        timeout_seconds=30,
-        session=None,
-        tracing_enabled=False,
-        run_id="t2",
-    )
+    loop = [[function_call("container_list", {}, call_id=f"c{i}")] for i in range(5)]
+    async with connect(_mcp_servers(fake_mcp_settings, recorder)) as manager:
+        agent = build_agent(_bundle(ScriptedModel(loop)), mcp_servers=manager.active_servers)
+        outcome = await run_agent(
+            agent,
+            "x",
+            max_turns=3,
+            timeout_seconds=30,
+            session=None,
+            tracing_enabled=False,
+            run_id="t2",
+        )
     assert outcome.status == "max_turns"
     statuses = [r.status for r in recorder.records]
     assert statuses[0] == "ok" and set(statuses[1:]) == {"budget_exhausted"}
 
 
-async def test_invalid_final_output_is_reported(settings):
-    store = EvidenceStore(snapshot=build_snapshot(settings), findings=[], scans=[])
+async def test_invalid_final_output_is_reported():
     model = ScriptedModel([[assistant_message("Sorry, I cannot help with that.")]])
-    agent = build_agent(
-        _bundle(model),
-        mcp_servers=[],
-        evidence_tools=build_evidence_tools(store, ToolCallRecorder(5)),
-    )
+    agent = build_agent(_bundle(model), mcp_servers=[])
     outcome = await run_agent(
         agent,
         "x",
@@ -199,12 +194,23 @@ def pipeline_env(fake_mcp_settings, monkeypatch):
 
 async def test_full_live_pipeline_with_fakes(pipeline_env):
     settings, holder = pipeline_env
-    snap = build_snapshot(settings)
-    socket_id = next(f.id for f in rules.evaluate(snap, settings.rules) if f.rule_id == "C008")
     holder["model"] = ScriptedModel(
         [
-            [function_call("get_inventory_overview", {}, call_id="c1")],
-            [assistant_message(_final_json(socket_id, concern_resource="ghost-container"))],
+            [function_call("container_inspect", {"id_or_name": "simulation"}, call_id="c1")],
+            # not among the 3 scanned images -> refused: the agent may only scan
+            # what the answer key covers
+            [
+                function_call(
+                    "scan_image",
+                    {
+                        "target": "fortiphyd/grfics-workstation:latest",
+                        "targetType": "image",
+                        "scanType": [],
+                    },
+                    call_id="c2",
+                )
+            ],
+            [assistant_message(_final_json(SOCKET, ROUTER_CAPS, SIM_CVE, GHOST))],
         ]
     )
     settings.experiment.scan.max_images = 3
@@ -212,31 +218,51 @@ async def test_full_live_pipeline_with_fakes(pipeline_env):
     result = await run_assessment(settings, AssessOptions(model_profile="scripted"))
 
     assert result.status == "completed"
+    # deterministic report: no agent content
     r = result.report
-    assert r.summary.risk_source == "agent" and r.summary.overall_risk == "critical"
-    assert r.prioritized[0].finding_id == socket_id
-    assert len(r.prioritized) == 1  # hallucinated F-MADE-UP dropped
-    assert [c.resource_name for c in r.rejected_agent_claims] == ["ghost-container"]
-    assert len(r.vulnerabilities) == 3
-    assert result.json_path.exists() and result.md_path.exists()
-    assert any("F-MADE-UP" in e for e in r.errors)
+    assert r.summary.overall_risk == "critical" and len(r.vulnerabilities) == 3
+    assert result.md_path.name == "deterministic_report.md" and result.md_path.exists()
+    assert (result.md_path.parent / "deterministic_report.json").exists()
+
+    # agent report: only the agent's validated findings
+    a = result.agent_report
+    assert a.agent_status == "ok" and a.overall_risk == "critical"
+    assert [f.resource_name for f in a.findings] == ["simulation", "router", "simulation"]
+    assert [f.resource_name for f in a.rejected] == ["ghost-container"]
+    assert result.agent_md_path.name == "agent_report.md" and result.agent_md_path.exists()
+
+    # comparison
+    c = result.comparison
+    found = {m.deterministic.rule_id for m in c.found}
+    assert {"C008", "C002", "V001"} <= found
+    assert c.scores.found == len(c.found) and c.scores.missed == len(c.missed)
+    assert c.scores.deterministic_total == len(r.findings)
+    assert c.scores.agent_rejected == 1 and c.scores.agent_unmatched == 0
+    assert result.comparison_md_path.name == "comparison.md"
+    md = result.comparison_md_path.read_text()
+    assert "Missed by the agent" in md and "C008" in md
 
     repo = AssessmentRepository(settings.assessment_db_path)
     run = repo.get_run(result.run_id)
     assert run["status"] == "completed" and run["agent_status"] == "ok"
-    assert run["snapshot_id"] == r.snapshot_id
     calls = repo.load_tool_calls(result.run_id)
-    assert {c["phase"] for c in calls} == {"collector", "agent"}
+    agent_calls = [(c["server"], c["tool"], c["status"]) for c in calls if c["phase"] == "agent"]
+    assert agent_calls == [
+        ("docker", "container_inspect", "ok"),
+        ("trivy", "scan_image", "blocked"),
+    ]
     assert repo.load_report(result.run_id).run_id == result.run_id
+    assert repo.load_agent_report(result.run_id).findings[0].title == "Docker socket mounted"
+    assert repo.load_comparison(result.run_id).scores == c.scores
     repo.close()
 
 
-async def test_replay_reuses_stored_evidence_without_docker(pipeline_env, monkeypatch):
+async def test_replay_is_deterministic_only(pipeline_env, monkeypatch):
     settings, holder = pipeline_env
     # First a deterministic live run to store snapshot + scans.
     settings.experiment.scan.max_images = 2
     first = await run_assessment(settings, AssessOptions(use_agent=False))
-    assert first.report.summary.risk_source == "deterministic"
+    assert first.agent_report is None and first.comparison is None
 
     # Replay must not touch Docker / MCP at all.
     import docker_security_agent.pipeline as pipeline
@@ -245,31 +271,20 @@ async def test_replay_reuses_stored_evidence_without_docker(pipeline_env, monkey
         raise AssertionError("replay must not start MCP servers")
 
     monkeypatch.setattr(pipeline, "build_servers", no_docker)
-    holder["model"] = ScriptedModel(
-        [
-            [
-                function_call(
-                    "get_image_vulnerabilities",
-                    {
-                        "image": "fortiphyd/grfics-simulation:latest",
-                        "min_severity": "HIGH",
-                        "limit": 5,
-                    },
-                    call_id="c1",
-                )
-            ],
-            [assistant_message(_final_json("F-NOT-REAL"))],
-        ]
-    )
     replay = await run_assessment(
-        settings, AssessOptions(model_profile="scripted", snapshot_id=first.report.snapshot_id)
+        settings, AssessOptions(use_agent=False, snapshot_id=first.report.snapshot_id)
     )
     assert replay.report.snapshot_id == first.report.snapshot_id
     assert len(replay.report.vulnerabilities) == len(first.report.vulnerabilities)
     assert {f.id for f in replay.report.findings} == {f.id for f in first.report.findings}
-    # Only fake IDs were prioritised -> deterministic fallback ordering.
-    assert replay.report.prioritized[0].ranked_by == "deterministic"
     assert replay.report.docker_endpoint is None  # replay never touches Docker
+
+    # The agent needs live MCP tools: replaying it is refused.
+    with pytest.raises(ConfigError, match="no-agent runs only"):
+        await run_assessment(
+            settings,
+            AssessOptions(model_profile="scripted", snapshot_id=first.report.snapshot_id),
+        )
 
 
 def _raw_socket_endpoint(monkeypatch, settings):
@@ -365,45 +380,12 @@ async def test_failed_agent_still_produces_report(pipeline_env):
     result = await run_assessment(settings, AssessOptions(model_profile="scripted", scan=False))
     assert result.status == "completed_with_errors"
     assert result.report.findings  # deterministic evidence survives
-    assert result.report.summary.risk_source == "deterministic"
+    assert result.agent_report.agent_status == "error" and result.agent_report.findings == []
+    assert any("model server crashed" in e for e in result.agent_report.errors)
     assert any("model server crashed" in e for e in result.report.errors)
-
-
-async def test_missing_optional_args_and_informative_tool_errors(settings):
-    """Regression: qwen3 omitted `resource_name` and got only a generic SDK error.
-
-    Optional arguments now have defaults, and a genuinely bad call returns the
-    real validation error (so the model can fix it) and is recorded.
-    """
-    snap = build_snapshot(settings)
-    findings = rules.evaluate(snap, settings.rules)
-    store = EvidenceStore(snapshot=snap, findings=findings, scans=[])
-    recorder = ToolCallRecorder(10)
-    model = ScriptedModel(
-        [
-            [function_call("get_rule_findings", {"min_severity": "critical"}, call_id="c1")],
-            [function_call("get_container_details", {}, call_id="c2")],  # required arg missing
-            [assistant_message(_final_json(findings[0].id))],
-        ]
-    )
-    agent = build_agent(
-        _bundle(model), mcp_servers=[], evidence_tools=build_evidence_tools(store, recorder)
-    )
-    outcome = await run_agent(
-        agent,
-        "x",
-        max_turns=5,
-        timeout_seconds=30,
-        session=None,
-        tracing_enabled=False,
-        run_id="t4",
-    )
-    assert outcome.status == "ok"
-    first_output = str(model.calls[1].input)
-    assert "F-C008" in first_output  # call without resource_name worked
-    second_output = str(model.calls[2].input)
-    assert "Tool call failed" in second_output and "container_name" in second_output
-    assert [r.status for r in recorder.records] == ["ok", "error"]
+    # nothing found: every deterministic finding is missed
+    assert result.comparison.scores.found == 0
+    assert result.comparison.scores.missed == len(result.report.findings)
 
 
 # ---------------------------------------------------------------------------
@@ -411,11 +393,11 @@ async def test_missing_optional_args_and_informative_tool_errors(settings):
 # ---------------------------------------------------------------------------
 
 
-def _scripted_run(holder, socket_id):
+def _scripted_run(holder):
     holder["model"] = ScriptedModel(
         [
-            [function_call("get_inventory_overview", {}, call_id="c1")],
-            [assistant_message(_final_json(socket_id))],
+            [function_call("container_list", {}, call_id="c1")],
+            [assistant_message(_final_json(SOCKET))],
         ]
     )
 
@@ -423,16 +405,13 @@ def _scripted_run(holder, socket_id):
 async def test_live_run_writes_immutable_manifest(pipeline_env):
     settings, holder = pipeline_env
     settings.experiment.scan.max_images = 2
-    snap = build_snapshot(settings)
-    _scripted_run(
-        holder, next(f.id for f in rules.evaluate(snap, settings.rules) if f.rule_id == "C008")
-    )
+    _scripted_run(holder)
 
     result = await run_assessment(settings, AssessOptions(model_profile="scripted"))
 
     # file: written once, read-only, self-verifying
     path = result.manifest_path
-    assert path == result.json_path.parent / "manifest.json"
+    assert path == result.md_path.parent / "manifest.json"
     assert not path.stat().st_mode & 0o222
     doc = json.loads(path.read_text())
     m = doc["manifest"]
@@ -440,8 +419,8 @@ async def test_live_run_writes_immutable_manifest(pipeline_env):
     exp = m["experiment"]
     assert exp["scenario_id"] == settings.experiment.scenario_id
     assert exp["evidence"]["snapshot_id"] == result.report.snapshot_id
-    assert exp["prompt_bundle"]["version"] == "v3"
-    assert exp["schema_versions"]["db_schema_version"] >= 3
+    assert exp["prompt_bundle"]["version"] == "v4"
+    assert exp["schema_versions"]["db_schema_version"] >= 4
     assert exp["models"]["assessment_agent"]["model"] == "scripted"
     assert exp["sampling"]["assessment_agent"]["temperature"] == 0.2
     assert exp["agent"]["max_turns"] == settings.agent.limits.max_turns
@@ -468,33 +447,28 @@ async def test_live_run_writes_immutable_manifest(pipeline_env):
     assert doc["manifest_sha256"] in result.md_path.read_text()
 
 
-async def test_rerun_from_manifest_reproduces_configuration(pipeline_env):
-    settings, holder = pipeline_env
+async def test_rerun_of_deterministic_manifest_replays_pinned_evidence(pipeline_env):
+    settings, _ = pipeline_env
     settings.experiment.scan.max_images = 2
-    snap = build_snapshot(settings)
-    socket_id = next(f.id for f in rules.evaluate(snap, settings.rules) if f.rule_id == "C008")
-    _scripted_run(holder, socket_id)
     first = await run_assessment(
-        settings, AssessOptions(model_profile="scripted", objective="Custom objective")
+        settings, AssessOptions(use_agent=False, objective="Custom objective")
     )
     # A later live run of the same environment adds newer scans to the same snapshot.
     later = await run_assessment(settings, AssessOptions(use_agent=False))
     assert later.report.snapshot_id == first.report.snapshot_id
 
     # Local config drifts after the run; the manifest must win.
-    settings.agent.limits.max_turns = 3
     settings.rules.disabled_rules = ["C008"]
 
     import docker_security_agent.pipeline as pipeline
 
     def no_docker(*a, **k):
-        raise AssertionError("a manifest re-run must not start MCP servers")
+        raise AssertionError("a deterministic manifest re-run must not start MCP servers")
 
     pipeline_build_servers = pipeline.build_servers
     pipeline.build_servers = no_docker
     try:
         new_settings, opts = options_from_manifest(settings, str(first.manifest_path))
-        _scripted_run(holder, socket_id)
         rerun = await run_assessment(new_settings, opts)
     finally:
         pipeline.build_servers = pipeline_build_servers
@@ -514,6 +488,42 @@ async def test_rerun_from_manifest_reproduces_configuration(pipeline_env):
     # also addressable by run ID
     _, by_id = options_from_manifest(settings, first.run_id)
     assert by_id.replay_of.manifest_sha256 == a["manifest_sha256"]
+
+
+async def test_rerun_of_agent_manifest_runs_live_from_the_same_baseline(pipeline_env):
+    from docker_security_agent.inventory.baseline import record_baseline
+
+    settings, holder = pipeline_env
+    settings.experiment.scan.max_images = 2
+    record_baseline(settings.data_dir, "clean", build_snapshot(settings))
+    _scripted_run(holder)
+    first = await run_assessment(
+        settings,
+        AssessOptions(
+            model_profile="scripted", objective="Custom objective", range_baseline="clean"
+        ),
+    )
+
+    settings.agent.limits.max_turns = 3  # local drift; the manifest must win
+    new_settings, opts = options_from_manifest(settings, first.run_id)
+    assert opts.use_agent and opts.snapshot_id is None and opts.range_baseline == "clean"
+    assert new_settings.agent.limits.max_turns == first_limits(first)
+    _scripted_run(holder)
+    rerun = await run_assessment(new_settings, opts)
+
+    a = json.loads(first.manifest_path.read_text())["manifest"]
+    b = json.loads(rerun.manifest_path.read_text())["manifest"]
+    assert b["acquisition"]["mode"] == "live" and b["acquisition"]["range_check"]
+    assert b["replay_of"]["run_id"] == first.run_id
+    # Same configuration; only the freshly collected evidence differs.
+    same = {k: v for k, v in a["experiment"].items() if k != "evidence"}
+    assert {k: v for k, v in b["experiment"].items() if k != "evidence"} == same
+    assert rerun.comparison is not None
+
+
+def first_limits(result) -> int:
+    doc = json.loads(result.manifest_path.read_text())
+    return doc["manifest"]["experiment"]["agent"]["max_turns"]
 
 
 async def test_rerun_refuses_altered_manifest_or_prompt_drift(pipeline_env, monkeypatch, tmp_path):

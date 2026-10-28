@@ -128,9 +128,12 @@ agent. It uses normal Docker access and never goes through the proxy.
 4. Recreates each volume with its labels and unpacks its archive.
 5. Starts the lab from local images only (`--no-build --pull never`) and
    waits for health.
-6. Runs `docker-audit range verify NAME --since <start>`. It compares against
-   the fingerprint, ignoring container IDs, creation times and dynamic IPs,
-   and requires every container and volume to be newer than the reset.
+6. Runs `docker-audit range verify NAME --since <start> --project <project>`.
+   It compares against the fingerprint, ignoring container IDs, creation times
+   and dynamic IPs, and requires every GRFICS container and volume to be newer
+   than the reset. Other resources on the engine (the proxy, other projects'
+   volumes) predate the reset by design; until 2026-10-26 the check covered
+   them too, so every reset failed with "created ..., before the reset".
 
 **`list`** shows baselines and their last verified reset.
 
@@ -189,22 +192,31 @@ Output (on the Mac, in this repo):
 
 | Path | Contents |
 |---|---|
-| `outputs/run-<date>-<time>-<id>/report.md` | Human-readable report |
-| `outputs/run-.../report.json` | Same, machine-readable |
+| `outputs/run-<date>-<time>-<id>/agent_report.md` | What the agent found by itself (since prompt v4) |
+| `outputs/run-.../deterministic_report.md` | What the rules and Trivy found (no AI) |
+| `outputs/run-.../comparison.md` | What the agent found and **missed**, with scores |
+| `outputs/run-.../*.json` | The same three reports, machine-readable |
 | `outputs/run-.../manifest.json` | Read-only run configuration, evidence and baseline |
 | `data/assessments.db` | SQLite: runs, snapshots, scans, findings, tool calls |
 | `data/agent_sessions.db` | LLM conversation history |
 
 How to evaluate:
 
+Since prompt v4 (2026-10-26) the agent gets only the MCP tools and the
+objective. It never sees the deterministic findings; they are the answer key.
+
+- **Start with `comparison.md`.** Recall (how many deterministic findings the
+  agent found), severity-weighted recall, and the list of what it **missed**.
 - **Finding `status`.** `confirmed` = rule or scanner fact. `potential` = an
-  AI claim that passed evidence validation; review it by hand. `rejected` = an
-  AI claim that failed validation. The rejected rate is a useful metric.
-- **Compare against `--no-agent`.** The difference is what the LLM adds.
-- **Compare models on identical evidence.** Take the snapshot ID from
-  `docker-audit snapshots`, then run
-  `assess --model <profile> --snapshot snap-XXXX` for each model.
-- **Report section 12** has timing, tokens, tool calls and blocked calls.
+  agent finding that passed evidence validation; review it by hand. `rejected`
+  = an agent claim that failed validation. The rejection rate is a useful metric.
+- **"Outside the rules"** in the comparison: validated agent findings that match
+  no rule. Either something the rules do not check, or a weak claim. Review them.
+- **Compare models** by resetting the range before each live run
+  (`range.sh reset clean-v1`, then `assess --model <profile> --range-baseline
+  clean-v1`). Agent runs cannot be replayed on a stored snapshot any more.
+- **Metrics section** of `agent_report.md` has timing, tokens, tool calls and
+  blocked calls.
 
 ## 9. How the agent chooses and reaches the model
 

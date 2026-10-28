@@ -15,8 +15,12 @@ with two hashes:
 Everything outside ``experiment`` describes the run instance (ID, time, code
 commit) or how the evidence was acquired (live MCP servers, Docker endpoint,
 scan settings). Acquisition does not belong in the config hash because the
-evidence itself is pinned by ``snapshot_id`` + ``scan_ids``: a replay of those
-IDs is the same experiment even though it never contacts Docker.
+deterministic evidence is pinned by ``snapshot_id`` + ``scan_ids``.
+
+Re-running a manifest: a deterministic run is replayed on its pinned evidence
+(no Docker access). An agent run investigates live Docker with MCP tools, so
+it cannot be replayed; it is re-run live with the same configuration, and must
+start from the same range baseline when the original did.
 
 The JSON file is self-verifying: ``{"manifest": {...}, "manifest_sha256": ...}``.
 
@@ -41,7 +45,7 @@ from docker_security_agent.config import ConfigError, ModelProfile, Settings
 from docker_security_agent.memory.database import SCHEMA_VERSION
 from docker_security_agent.schemas.reports import AgentAssessment, DockerEndpointInfo, Report
 
-MANIFEST_VERSION = "1"
+MANIFEST_VERSION = "2"  # 2: agent runs are MCP-only; no findings_in_prompt
 MANIFEST_FILENAME = "manifest.json"
 
 # The single agent role of this tool. The reference framework has several
@@ -106,7 +110,6 @@ class AgentSettings(_Frozen):
     max_tool_calls: int
     max_duration_seconds: float
     max_tool_result_chars: int
-    findings_in_prompt: bool
     named_session: bool  # True = --session was used; earlier conversation may be in context
 
 
@@ -263,11 +266,7 @@ def build_manifest(
         sampling[ASSESSOR_ROLE] = Sampling(
             temperature=profile.temperature, max_tokens=profile.max_tokens
         )
-        agent_settings = AgentSettings(
-            **agent.limits.model_dump(),
-            findings_in_prompt=agent.findings_in_prompt,
-            named_session=named_session,
-        )
+        agent_settings = AgentSettings(**agent.limits.model_dump(), named_session=named_session)
     live = docker_endpoint is not None
     return RunManifest(
         run_id=run_id,
@@ -408,7 +407,6 @@ def apply_manifest(settings: Settings, manifest: RunManifest) -> tuple[Settings,
     settings.agent.tracing_enabled = exp.logging.tracing_enabled
     if exp.agent is not None:
         a = exp.agent
-        settings.agent.findings_in_prompt = a.findings_in_prompt
         settings.agent.limits = type(settings.agent.limits)(
             max_turns=a.max_turns,
             max_tool_calls=a.max_tool_calls,

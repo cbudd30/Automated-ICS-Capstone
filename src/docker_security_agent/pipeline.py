@@ -7,26 +7,37 @@ bottom gives the whole workflow:
                       for live runs, that Docker is reached via the read-only
                       proxy; install the Trivy plugin / DB if needed
     1. record run     create the `runs` row (status=running)
-    2. evidence       LIVE:   connect MCP servers -> collect inventory snapshot
-                              -> run deterministic rules -> scan images
+    2. deterministic  LIVE:   connect MCP servers -> collect inventory snapshot
+       evidence               -> run deterministic rules -> scan images
                       REPLAY: load a stored snapshot + its stored scans
-                              (no Docker access at all)
-    3. agent          run DockerSecurityAssessmentAgent (optional) with the
-                      evidence tools (+ live MCP tools in live mode)
-    4. validate       check the agent's output against the evidence
-    5. persist        findings, scans, tool calls, metrics -> SQLite
+                              (no Docker access at all; --no-agent only)
     2b. manifest      freeze the immutable run manifest (config + pinned
                       evidence) -> outputs/<run_id>/manifest.json + SQLite
                       (with --range-baseline: the live range must first match
                       the named baseline, else the run aborts before scanning)
-    6. report         outputs/<run_id>/report.json + report.md
+    3. agent          run DockerSecurityAssessmentAgent with the MCP tools
+                      ONLY. It never sees step 2's results: it discovers the
+                      environment itself and reports its own findings
+    4. validate       check the agent's findings against step 2's evidence
+    5. compare        agent findings vs deterministic findings (answer key):
+                      found / missed / outside the rules / rejected + scores
+    6. persist        findings, scans, tool calls, metrics, reports -> SQLite
+    7. reports        outputs/<run_id>/deterministic_report.{json,md} always;
+                      agent_report.{json,md} + comparison.{json,md} with an agent
+
+Step 2 runs first because the agent's guard rails need it: the tool policy
+only lets Trivy scan images in the inventory, and validation checks the
+agent's claims against it. The agent itself gets none of it.
 
 Modes
 -----
-* ``live``          - default; collects fresh evidence from Docker.
-* ``replay``        - ``--snapshot ID``; re-uses stored evidence so different
-                      models can be compared on identical inputs.
+* ``live``          - default; collects fresh evidence from Docker and runs
+                      the agent.
 * ``deterministic`` - ``--no-agent``; rules + scanner only, no LLM.
+* ``replay``        - ``--no-agent --snapshot ID``; re-runs the rules on stored
+                      evidence. Agent runs cannot be replayed (the agent needs
+                      live MCP tools); compare models by resetting the range
+                      (deploy/grfics/range.sh) before each live run instead.
 """
 
 from __future__ import annotations
@@ -45,9 +56,7 @@ from agents import set_tracing_disabled
 from docker_security_agent import PROMPT_VERSION
 from docker_security_agent.agents.security_assessment import (
     AgentRunOutcome,
-    EvidenceStore,
     build_agent,
-    build_evidence_tools,
     build_input,
     run_agent,
 )
@@ -88,11 +97,14 @@ from docker_security_agent.mcp.registry import (
 from docker_security_agent.mcp.servers import GuardedMCPServer
 from docker_security_agent.memory.repository import AssessmentRepository
 from docker_security_agent.memory.sessions import open_session
+from docker_security_agent.reporting.agent_report import build_agent_report, write_agent_report
+from docker_security_agent.reporting.comparison_report import write_comparison
 from docker_security_agent.reporting.generator import build_report, write_report
 from docker_security_agent.schemas.assets import InventorySnapshot
-from docker_security_agent.schemas.findings import Finding
 from docker_security_agent.schemas.observations import ImageScanResult
 from docker_security_agent.schemas.reports import (
+    AgentReport,
+    Comparison,
     DockerEndpointInfo,
     MCPServerInfo,
     ModelInfo,
@@ -100,6 +112,7 @@ from docker_security_agent.schemas.reports import (
     RunMetrics,
 )
 from docker_security_agent.security import rules
+from docker_security_agent.security.comparison import compare
 from docker_security_agent.security.scanner import scan_images, trivy_version
 from docker_security_agent.security.validation import ValidationOutcome, validate_agent_output
 from docker_security_agent.security.vulnerability_parser import vulnerability_findings
@@ -112,7 +125,7 @@ class AssessmentAborted(Exception):
 @dataclass
 class AssessOptions:
     model_profile: str | None = None  # None -> experiment.default_model
-    snapshot_id: str | None = None  # replay mode
+    snapshot_id: str | None = None  # replay mode (deterministic runs only)
     use_agent: bool = True
     scan: bool | None = None  # None -> experiment.scan.enabled
     session_name: str | None = None
@@ -142,10 +155,13 @@ class _ManifestHolder:
 class AssessResult:
     run_id: str
     status: str
-    report: Report
-    json_path: Path
-    md_path: Path
+    report: Report  # deterministic report
+    md_path: Path  # deterministic_report.md
     manifest_path: Path | None
+    agent_report: AgentReport | None = None
+    agent_md_path: Path | None = None
+    comparison: Comparison | None = None
+    comparison_md_path: Path | None = None
 
 
 def new_run_id() -> str:
@@ -262,10 +278,12 @@ def load_manifest(settings: Settings, source: str) -> RunManifest:
 def options_from_manifest(
     settings: Settings, source: str, *, allow_drift: bool = False
 ) -> tuple[Settings, AssessOptions]:
-    """Settings + options that re-run a manifest's configuration on its pinned evidence.
+    """Settings + options that re-run a manifest's configuration.
 
-    The re-run is a replay: same snapshot, same scan IDs, no Docker access. Raises
-    ConfigError if the prompt or schemas changed since (unless ``allow_drift``).
+    A deterministic manifest is replayed: same snapshot, same scan IDs, no Docker
+    access. An agent manifest is re-run LIVE (the agent needs MCP tools), and must
+    match the original's range baseline when it had one. Raises ConfigError if the
+    prompt or schemas changed since (unless ``allow_drift``).
     """
     manifest = load_manifest(settings, source)
     blocking, info = drift(manifest, settings.project_root)
@@ -283,12 +301,19 @@ def options_from_manifest(
             f"re-run of {manifest.run_id}: the original continued a named session; "
             "the re-run starts a fresh one"
         )
+    live = profile_name is not None
+    if live and exp.range_baseline is None:
+        notes.append(
+            f"re-run of {manifest.run_id}: the original was not checked against a range "
+            "baseline, so the live environment may differ"
+        )
     opts = AssessOptions(
-        range_ref=exp.range_baseline,
+        range_ref=None if live else exp.range_baseline,
+        range_baseline=exp.range_baseline.name if live and exp.range_baseline else None,
         model_profile=profile_name,
-        snapshot_id=exp.evidence.snapshot_id,
-        scan_ids=list(exp.evidence.scan_ids),
-        use_agent=profile_name is not None,
+        snapshot_id=None if live else exp.evidence.snapshot_id,
+        scan_ids=None if live else list(exp.evidence.scan_ids),
+        use_agent=live,
         objective=exp.objective,
         replay_of=ReplayOf(run_id=manifest.run_id, manifest_sha256=manifest.manifest_sha256()),
         notes=notes,
@@ -306,6 +331,12 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
     set_tracing_disabled(not settings.agent.tracing_enabled)
 
     replay = opts.snapshot_id is not None
+    if replay and opts.use_agent:
+        raise ConfigError(
+            "--snapshot replays stored evidence for --no-agent runs only: the agent "
+            "investigates live Docker with MCP tools. Reset the range "
+            "(deploy/grfics/range.sh reset NAME) and run live with --range-baseline NAME."
+        )
     scanning = (settings.experiment.scan.enabled if opts.scan is None else opts.scan) and not replay
     mode = "replay" if replay else ("live" if opts.use_agent else "deterministic")
     objective = (opts.objective or settings.experiment.objective).strip()
@@ -412,16 +443,7 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
     try:
         if replay:
             snapshot, scans, findings, outcome = await _replay_phase(
-                settings,
-                opts,
-                repo,
-                bundle,
-                recorder,
-                objective,
-                run_id,
-                session_id,
-                metrics,
-                freeze_manifest,
+                settings, opts, repo, run_id, freeze_manifest
             )
         else:
             snapshot, scans, findings, outcome, server_infos = await _live_phase(
@@ -442,7 +464,7 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
                 check_range,
             )
 
-        # 4. validate the agent output against the evidence
+        # 4. validate the agent's findings against the deterministic evidence
         validation: ValidationOutcome | None = None
         agent_status = "skipped"
         if outcome is not None:
@@ -450,17 +472,22 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
             if outcome.error:
                 errors.append(f"agent: {outcome.error}")
             if outcome.assessment is not None:
-                validation = validate_agent_output(outcome.assessment, findings, snapshot, scans)
+                validation = validate_agent_output(
+                    outcome.assessment,
+                    snapshot,
+                    scans,
+                    ignored_containers=settings.rules.ignore_containers,
+                )
             metrics.model_requests = outcome.usage.get("requests", 0)
             metrics.input_tokens = outcome.usage.get("input_tokens")
             metrics.output_tokens = outcome.usage.get("output_tokens")
             metrics.total_tokens = outcome.usage.get("total_tokens")
             metrics.agent_seconds = outcome.duration_seconds
 
-        # 5. persist findings + tool calls + metrics
+        # 6. persist findings + tool calls + metrics
         all_findings = list(findings)
         if validation:
-            all_findings += validation.concerns + validation.rejected
+            all_findings += validation.findings + validation.rejected + validation.out_of_scope
         repo.save_findings(run_id, all_findings)
         repo.save_tool_calls(run_id, recorder.records)
 
@@ -476,20 +503,23 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
         status = (
             "completed_with_errors" if (agent_failed or snapshot.collection_errors) else "completed"
         )
-
-        # 6. report
-        report = build_report(
-            run_id=run_id,
-            status=status,
-            objective=objective,
-            model=ModelInfo(
+        model_info = (
+            ModelInfo(
                 profile=profile.name,
                 provider=profile.provider,
                 model=profile.model,
                 settings=profile.public_dict(),
             )
             if profile
-            else None,
+            else None
+        )
+
+        # 7a. deterministic report (always)
+        report = build_report(
+            run_id=run_id,
+            status=status,
+            objective=objective,
+            model=model_info,
             prompt_version=PROMPT_VERSION,
             mcp_servers=server_infos,
             docker_endpoint=endpoint,
@@ -498,13 +528,40 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
             snapshot=snapshot,
             findings=findings,
             scans=scans,
-            validation=validation,
-            agent_status=agent_status,
             errors=errors,
             metrics=metrics,
         )
-        json_path, md_path = write_report(report, settings.output_dir)
+        md_path = write_report(report, settings.output_dir)
         repo.save_report(run_id, report)
+        result = AssessResult(run_id, status, report, md_path, frozen.path)
+
+        # 5 + 7b. agent report and comparison (agent runs only)
+        if outcome is not None and model_info is not None:
+            result.agent_report = build_agent_report(
+                run_id=run_id,
+                model=model_info,
+                prompt_version=PROMPT_VERSION,
+                agent_status=agent_status,
+                snapshot_id=snapshot.snapshot_id,
+                validation=validation,
+                errors=[e for e in errors if e.startswith("agent:")],
+                metrics=metrics,
+            )
+            result.agent_md_path = write_agent_report(
+                result.agent_report, server_infos, settings.output_dir
+            )
+            repo.save_agent_report(run_id, result.agent_report)
+            result.comparison = compare(
+                run_id=run_id,
+                model=model_info,
+                agent_status=agent_status,
+                deterministic=findings,
+                validation=validation,
+                snapshot=snapshot,
+            )
+            result.comparison_md_path = write_comparison(result.comparison, settings.output_dir)
+            repo.save_comparison(run_id, result.comparison)
+
         repo.update_run(
             run_id,
             finished_at=datetime.now(UTC).isoformat(),
@@ -514,7 +571,7 @@ async def run_assessment(settings: Settings, opts: AssessOptions) -> AssessResul
             metrics_json=metrics.model_dump(mode="json"),
             mcp_servers_json=[s.model_dump() for s in server_infos],
         )
-        return AssessResult(run_id, status, report, json_path, md_path, frozen.path)
+        return result
     except BaseException as exc:
         # Leave an honest trail in SQLite, then re-raise for the CLI to show.
         repo.save_tool_calls(run_id, recorder.records)
@@ -621,6 +678,8 @@ async def _live_phase(
                 scans, snapshot, settings.rules.vulnerability_min_severity
             )
             findings.sort(key=lambda f: f.sort_key())
+            # The agent may scan exactly the images the answer key covers.
+            policy.set_scan_targets(_image_refs(snapshot, {s.image_id for s in scans}))
         elif scanning:
             errors.append("Image scanning requested but the Trivy MCP server is unavailable.")
 
@@ -633,24 +692,23 @@ async def _live_phase(
 
         freeze_manifest(snapshot.snapshot_id, scan_ids)
 
-        # 3. agent (MCP servers still connected)
+        # 3. agent (MCP servers still connected; it gets nothing from step 2)
         outcome = None
         if bundle is not None:
             outcome = await _agent_phase(
-                settings,
-                opts,
-                bundle,
-                recorder,
-                active,
-                snapshot,
-                findings,
-                scans,
-                objective,
-                run_id,
-                session_id,
-                live_tools=True,
+                settings, opts, bundle, recorder, active, snapshot, objective, run_id, session_id
             )
     return snapshot, scans, findings, outcome, infos
+
+
+def _image_refs(snapshot: InventorySnapshot, image_ids: set[str]) -> set[str]:
+    """Every reference (ID, short ID, tag, digest) of the given images."""
+    refs: set[str] = set()
+    for img in snapshot.images:
+        if img.id in image_ids:
+            short = img.id.removeprefix("sha256:")
+            refs |= {img.id, short, short[:12], *img.tags, *img.digests}
+    return refs
 
 
 # ---------------------------------------------------------------------------
@@ -658,9 +716,7 @@ async def _live_phase(
 # ---------------------------------------------------------------------------
 
 
-async def _replay_phase(
-    settings, opts, repo, bundle, recorder, objective, run_id, session_id, metrics, freeze_manifest
-):
+async def _replay_phase(settings, opts, repo, run_id, freeze_manifest):
     snapshot = repo.load_snapshot(opts.snapshot_id)
     if snapshot is None:
         raise AssessmentAborted(
@@ -682,23 +738,7 @@ async def _replay_phase(
         scans, snapshot, settings.rules.vulnerability_min_severity
     )
     findings.sort(key=lambda f: f.sort_key())
-    outcome = None
-    if bundle is not None:
-        outcome = await _agent_phase(
-            settings,
-            opts,
-            bundle,
-            recorder,
-            [],
-            snapshot,
-            findings,
-            scans,
-            objective,
-            run_id,
-            session_id,
-            live_tools=False,
-        )
-    return snapshot, scans, findings, outcome
+    return snapshot, scans, findings, None
 
 
 # ---------------------------------------------------------------------------
@@ -713,40 +753,28 @@ async def _agent_phase(
     recorder: ToolCallRecorder,
     mcp_servers: list[GuardedMCPServer],
     snapshot: InventorySnapshot,
-    findings: list[Finding],
-    scans: list[ImageScanResult],
     objective: str,
     run_id: str,
     session_id: str,
-    *,
-    live_tools: bool,
 ) -> AgentRunOutcome:
-    ignored = {
+    # Only the names of excluded infrastructure (e.g. the read-only proxy) are
+    # passed on, so the agent does not report the assessment tooling itself.
+    out_of_scope = [
         c.name
         for c in snapshot.containers
         if any(fnmatch.fnmatchcase(c.name, p) for p in settings.rules.ignore_containers)
-    }
-    store = EvidenceStore(
-        snapshot=snapshot, findings=findings, scans=scans, ignored_containers=ignored
-    )
-    agent = build_agent(
-        bundle, mcp_servers=mcp_servers, evidence_tools=build_evidence_tools(store, recorder)
-    )
+    ]
+    agent = build_agent(bundle, mcp_servers=mcp_servers)
     limits = settings.agent.limits
     _say(
         opts,
-        f"Running {agent.name} with {bundle.profile.name} "
+        f"Running {agent.name} with {bundle.profile.name}, MCP tools only "
         f"(max {limits.max_turns} turns, {limits.max_tool_calls} tool calls, "
         f"{limits.max_duration_seconds:.0f}s)...",
     )
     outcome = await run_agent(
         agent,
-        build_input(
-            objective,
-            store,
-            live_tools=live_tools,
-            findings_in_prompt=settings.agent.findings_in_prompt,
-        ),
+        build_input(objective, out_of_scope),
         max_turns=limits.max_turns,
         timeout_seconds=limits.max_duration_seconds,
         session=open_session(session_id, settings.session_db_path),

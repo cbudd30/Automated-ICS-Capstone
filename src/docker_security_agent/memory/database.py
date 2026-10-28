@@ -7,8 +7,9 @@ models, and re-rendered later.
 Tables
 ------
 runs          one row per assessment run: model, prompt version, MCP versions,
-              objective, snapshot used, status, errors, metrics, final report,
-              and the run's immutable manifest + its hashes
+              objective, snapshot used, status, errors, metrics, the three
+              reports (deterministic, agent, comparison), and the run's
+              immutable manifest + its hashes
 snapshots     inventory snapshots (content-addressed by snapshot_id); shared
               by every run that used the same evidence
 scans         one row per image scan (linked to the snapshot it belongs to)
@@ -28,7 +29,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_info (
@@ -53,6 +54,8 @@ CREATE TABLE IF NOT EXISTS runs (
     finished_at     TEXT,
     status          TEXT NOT NULL,         -- running / completed / completed_with_errors / failed
     mode            TEXT NOT NULL,         -- live / replay / deterministic
+                                           -- (replay: deterministic re-run on stored
+                                           -- evidence; agent runs are always live)
     objective       TEXT NOT NULL,
     model_profile   TEXT,
     model_provider  TEXT,
@@ -70,7 +73,9 @@ CREATE TABLE IF NOT EXISTS runs (
     agent_status    TEXT,      -- ok/skipped/error/timeout/max_turns/invalid_output
     errors_json     TEXT,
     metrics_json    TEXT,
-    report_json     TEXT                   -- the final Report (for `docker-audit report`)
+    report_json     TEXT,                  -- deterministic Report (`docker-audit report`)
+    agent_report_json TEXT,                -- AgentReport (agent runs only)
+    comparison_json TEXT                   -- Comparison: agent vs deterministic
 );
 
 CREATE TABLE IF NOT EXISTS scans (
@@ -163,6 +168,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "manifest_sha256",  # v3
         "config_sha256",  # v3
         "manifest_json",  # v3
+        "agent_report_json",  # v4
+        "comparison_json",  # v4
     ]
     run_cols = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
     for col in added_run_columns:

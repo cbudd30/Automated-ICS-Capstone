@@ -1,19 +1,20 @@
-"""Build the final ``Report`` and write ``report.json`` + ``report.md``.
+"""Build the deterministic ``Report`` and write ``deterministic_report.json`` + ``.md``.
 
-``build_report`` merges four sources into one validated ``Report`` object:
+Every run writes this report. It contains no LLM output at all: it is what the
+rules and the scanner found, and it is the answer key the agent's own report
+is compared against (see agent_report.py and comparison_report.py).
+
+``build_report`` merges three sources into one validated ``Report`` object:
 
 1. the inventory snapshot      -> container / image / network tables
-2. confirmed findings          -> rule + scanner findings (facts)
-3. the validated agent output  -> prioritisation, summary, potential concerns
-4. run metadata                -> model, MCP servers, metrics, errors
-
-If the agent failed (bad model, timeout, invalid output...), the report is
-still produced: prioritisation falls back to a deterministic ordering
-(severity, then confidence) and the summary says the AI analysis is missing.
-That way a weak model can never make the deterministic evidence disappear.
+2. confirmed findings          -> rule + scanner findings (facts), ordered by
+                                  severity (running resources and configuration
+                                  issues first within a severity)
+3. run metadata                -> MCP servers, metrics, errors
 
 ``render_markdown`` turns the Report into a human-readable document. The
-JSON file is the source of truth; the Markdown is derived from it.
+JSON file is the source of truth; the Markdown is derived from it. The table
+and finding helpers here are shared by the other two reports.
 """
 
 from __future__ import annotations
@@ -38,10 +39,9 @@ from docker_security_agent.schemas.reports import (
     RunMetrics,
 )
 from docker_security_agent.security.findings import severity_counts
-from docker_security_agent.security.validation import ValidationOutcome
 from docker_security_agent.security.vulnerability_parser import SEVERITY_ORDER, sort_vulns
 
-# Always-true limitations of this tool (the agent may add run-specific ones).
+# Always-true limitations of this tool.
 STANDARD_LIMITATIONS = [
     "Metadata-only assessment: no runtime behaviour, network traffic or in-container files "
     "were inspected, and no active scanning was performed.",
@@ -74,8 +74,6 @@ def build_report(
     config_sha256: str | None = None,
     findings: list[Finding],
     scans: list[ImageScanResult],
-    validation: ValidationOutcome | None,
-    agent_status: str,
     errors: list[str],
     metrics: RunMetrics,
 ) -> Report:
@@ -154,81 +152,52 @@ def build_report(
             )
         )
 
-    # ---- prioritisation: agent if valid, else deterministic
+    # ---- prioritisation: severity first; within a severity, issues on
+    # RUNNING containers before stopped ones (they are exploitable now).
     by_id = {f.id: f for f in findings}
-    prioritized: list[PrioritizedEntry] = []
-    if validation and validation.prioritized:
-        for i, item in enumerate(validation.prioritized, start=1):
-            f = by_id[item.finding_id]
-            prioritized.append(
-                PrioritizedEntry(
-                    rank=i,
-                    finding_id=f.id,
-                    title=f.title,
-                    resource_name=f.resource_name,
-                    severity=f.severity.value,
-                    rationale=item.rationale,
-                    ranked_by="agent",
-                )
-            )
-    else:
-        # Deterministic fallback: severity first; within a severity, issues on
-        # RUNNING containers before stopped ones (they are exploitable now).
-        running = {c.name for c in snapshot.containers if c.running}
+    running = {c.name for c in snapshot.containers if c.running}
+    image_users = {
+        img.display_name: {c.name for c in snapshot.containers if c.image_id == img.id}
+        for img in snapshot.images
+    }
 
-        image_users = {
-            img.display_name: {c.name for c in snapshot.containers if c.image_id == img.id}
-            for img in snapshot.images
-        }
+    def _priority_key(f: Finding) -> tuple:
+        if f.resource_type == "container":
+            stopped = f.resource_name not in running
+        elif f.resource_type == "image":
+            stopped = not (image_users.get(f.resource_name, set()) & running)
+        else:
+            stopped = False
+        # Within a severity: live resources first, then configuration
+        # findings (direct, certain impact) before CVE findings (impact
+        # depends on reachability), then the usual confidence/name order.
+        is_vuln = f.rule_id == "V001"
+        return (-f.severity.rank, stopped, is_vuln, *f.sort_key()[1:])
 
-        def _fallback_key(f: Finding) -> tuple:
-            if f.resource_type == "container":
-                stopped = f.resource_name not in running
-            elif f.resource_type == "image":
-                stopped = not (image_users.get(f.resource_name, set()) & running)
-            else:
-                stopped = False
-            # Within a severity: live resources first, then configuration
-            # findings (direct, certain impact) before CVE findings (impact
-            # depends on reachability), then the usual confidence/name order.
-            is_vuln = f.rule_id == "V001"
-            return (-f.severity.rank, stopped, is_vuln, *f.sort_key()[1:])
-
-        candidates = [f for f in findings if f.severity.rank >= Severity.MEDIUM.rank]
-        top = sorted(candidates, key=_fallback_key)[:15]
-        for i, f in enumerate(top, start=1):
-            prioritized.append(
-                PrioritizedEntry(
-                    rank=i,
-                    finding_id=f.id,
-                    title=f.title,
-                    resource_name=f.resource_name,
-                    severity=f.severity.value,
-                    rationale="Ordered by severity and confidence "
-                    "(no valid agent prioritisation available).",
-                    ranked_by="deterministic",
-                )
-            )
+    candidates = [f for f in findings if f.severity.rank >= Severity.MEDIUM.rank]
+    prioritized = [
+        PrioritizedEntry(
+            rank=i,
+            finding_id=f.id,
+            title=f.title,
+            resource_name=f.resource_name,
+            severity=f.severity.value,
+        )
+        for i, f in enumerate(sorted(candidates, key=_priority_key)[:15], start=1)
+    ]
 
     # ---- summary
-    if validation:
-        summary_text = validation.assessment.executive_summary
-        risk, risk_source = validation.assessment.overall_risk, "agent"
-        recommendations = validation.assessment.recommendations
-        limitations = STANDARD_LIMITATIONS + validation.assessment.limitations
-    else:
-        sev = severity_counts(findings)
-        summary_text = (
-            f"AI analysis unavailable (agent status: {agent_status}). Deterministic checks "
-            f"produced {len(findings)} findings ({sev['critical']} critical, {sev['high']} "
-            f"high, {sev['medium']} medium). See prioritised findings and remediation below."
-        )
-        risk, risk_source = _deterministic_risk(findings), "deterministic"
-        # Fallback recommendations = remediation of the top findings (deduplicated).
-        recommendations = list(
-            dict.fromkeys(p.title + ": " + by_id[p.finding_id].remediation for p in prioritized[:8])
-        )
-        limitations = list(STANDARD_LIMITATIONS)
+    sev = severity_counts(findings)
+    summary_text = (
+        f"Deterministic checks (rules and Trivy) produced {len(findings)} findings "
+        f"({sev['critical']} critical, {sev['high']} high, {sev['medium']} medium, "
+        f"{sev['low']} low, {sev['info']} info). No AI was involved in this report."
+    )
+    # Recommendations = remediation of the top findings (deduplicated).
+    recommendations = list(
+        dict.fromkeys(p.title + ": " + by_id[p.finding_id].remediation for p in prioritized[:8])
+    )
+    limitations = list(STANDARD_LIMITATIONS)
 
     if snapshot.collection_errors:
         limitations.append(
@@ -248,8 +217,7 @@ def build_report(
         )
 
     summary = ReportSummary(
-        overall_risk=risk,
-        risk_source=risk_source,
+        overall_risk=_deterministic_risk(findings),
         executive_summary=summary_text,
         containers_total=len(snapshot.containers),
         containers_running=sum(c.running for c in snapshot.containers),
@@ -260,10 +228,6 @@ def build_report(
         vulnerable_images=sum(1 for s in scans if s.status == "ok" and s.total > 0),
         total_vulnerabilities=totals,
     )
-
-    all_errors = list(errors)
-    if validation:
-        all_errors += [f"agent output validation: {n}" for n in validation.notes]
 
     return Report(
         run_id=run_id,
@@ -285,13 +249,11 @@ def build_report(
         images=images,
         networks=networks,
         findings=findings,
-        potential_concerns=validation.concerns if validation else [],
-        rejected_agent_claims=validation.rejected if validation else [],
         vulnerabilities=vuln_summaries,
         prioritized=prioritized,
         recommendations=recommendations,
         limitations=limitations,
-        errors=all_errors,
+        errors=list(errors),
         metrics=metrics,
     )
 
@@ -354,18 +316,21 @@ def _endpoint_line(e: DockerEndpointInfo) -> str:
 def render_markdown(r: Report) -> str:
     s = r.summary
     md: list[str] = []
-    md.append(f"# Docker Security Assessment — `{r.run_id}`\n")
+    md.append(f"# Deterministic Security Assessment — `{r.run_id}`\n")
     md.append(
         f"**Status:** {r.status} · **Overall risk:** {s.overall_risk.upper()} "
-        f"(determined by {s.risk_source}) · **Generated:** {r.generated_at:%Y-%m-%d %H:%M UTC}\n"
+        f"(highest severity found) · **Generated:** {r.generated_at:%Y-%m-%d %H:%M UTC}\n"
     )
-    if r.model:
-        md.append(
-            f"**Model:** `{r.model.profile}` ({r.model.provider} / `{r.model.model}`) · "
-            f"**Prompt:** {r.prompt_version} · **Snapshot:** `{r.snapshot_id}`\n"
+    md.append(
+        f"**Source:** rules + Trivy only, no AI · **Snapshot:** `{r.snapshot_id}`"
+        + (
+            f" · **Agent model in this run:** `{r.model.profile}` (see agent_report.md and "
+            "comparison.md)"
+            if r.model
+            else ""
         )
-    else:
-        md.append(f"**Model:** none (deterministic run) · **Snapshot:** `{r.snapshot_id}`\n")
+        + "\n"
+    )
     if r.manifest_sha256:
         md.append(
             f"**Manifest:** `manifest.json` · sha256 `{r.manifest_sha256}` · "
@@ -472,17 +437,14 @@ def render_markdown(r: Report) -> str:
 
     md.append("\n## 6. Prioritized findings\n")
     md.append(
+        "Ordered by severity; within a severity, running resources and configuration issues "
+        "first.\n"
+    )
+    md.append(
         _table(
-            ["#", "Severity", "Finding", "Resource", "Rationale", "Ranked by"],
+            ["#", "Severity", "Finding", "Resource"],
             [
-                [
-                    str(p.rank),
-                    p.severity,
-                    f"`{p.finding_id}` {p.title}",
-                    p.resource_name,
-                    p.rationale,
-                    p.ranked_by,
-                ]
+                [str(p.rank), p.severity, f"`{p.finding_id}` {p.title}", p.resource_name]
                 for p in r.prioritized
             ],
         )
@@ -526,33 +488,27 @@ def render_markdown(r: Report) -> str:
     for f in [f for f in r.findings if f.rule_id == "V001"]:
         md.append(_finding_block(f))
 
-    md.append("\n## 9. Potential concerns (AI-proposed, needs human review)\n")
-    if r.potential_concerns:
-        for f in r.potential_concerns:
-            md.append(_finding_block(f))
-    else:
-        md.append("_None._\n")
-    if r.rejected_agent_claims:
-        md.append("\n### Rejected agent claims (failed evidence validation)\n")
-        for f in r.rejected_agent_claims:
-            md.append(f"- **{f.title}** (`{f.resource_name}`): {'; '.join(f.validation_notes)}")
-        md.append("")
-
-    md.append("\n## 10. Remediation recommendations\n")
+    md.append("\n## 9. Remediation recommendations\n")
     md.append(
         "\n".join(f"{i}. {rec}" for i, rec in enumerate(r.recommendations, 1)) + "\n"
         if r.recommendations
         else "_None._\n"
     )
 
-    md.append("\n## 11. Limitations and unknowns\n")
+    md.append("\n## 10. Limitations and unknowns\n")
     md.append("\n".join(f"- {lim}" for lim in r.limitations) + "\n")
     if r.errors:
         md.append("\n**Errors / notes during the run:**\n")
         md.append("\n".join(f"- {_md_escape(e)}" for e in r.errors) + "\n")
 
-    m = r.metrics
-    md.append("\n## 12. Model and execution metrics\n")
+    md.append("\n## 11. Execution metrics\n")
+    md.append(metrics_markdown(r.metrics, r.mcp_servers))
+    return "\n".join(md)
+
+
+def metrics_markdown(m: RunMetrics, mcp_servers: list[MCPServerInfo]) -> str:
+    """Metrics + MCP server tables (shared with the agent report)."""
+    md: list[str] = []
     md.append(
         _table(
             ["Metric", "Value"],
@@ -589,7 +545,7 @@ def render_markdown(r: Report) -> str:
                     "yes" if srv.connected else f"no ({srv.error or ''})",
                     ", ".join(srv.approved_tools),
                 ]
-                for srv in r.mcp_servers
+                for srv in mcp_servers
             ],
         )
     )
@@ -602,12 +558,25 @@ def render_markdown(r: Report) -> str:
     return "\n".join(md)
 
 
-def write_report(report: Report, output_dir: Path) -> tuple[Path, Path]:
-    """Write outputs/<run_id>/report.json and report.md; return both paths."""
-    run_dir = output_dir / report.run_id
+DETERMINISTIC_REPORT = "deterministic_report"
+
+
+def write_files(output_dir: Path, run_id: str, stem: str, json_text: str, md: str) -> Path:
+    """Write outputs/<run_id>/<stem>.json and <stem>.md; return the .md path."""
+    run_dir = output_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-    json_path = run_dir / "report.json"
-    md_path = run_dir / "report.md"
-    json_path.write_text(report.model_dump_json(indent=2))
-    md_path.write_text(render_markdown(report))
-    return json_path, md_path
+    (run_dir / f"{stem}.json").write_text(json_text)
+    md_path = run_dir / f"{stem}.md"
+    md_path.write_text(md)
+    return md_path
+
+
+def write_report(report: Report, output_dir: Path) -> Path:
+    """Write the deterministic report (.json + .md); return the .md path."""
+    return write_files(
+        output_dir,
+        report.run_id,
+        DETERMINISTIC_REPORT,
+        report.model_dump_json(indent=2),
+        render_markdown(report),
+    )

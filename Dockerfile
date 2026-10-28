@@ -81,7 +81,8 @@ RUN trivy plugin list | grep -q mcp \
 
 # Persistent state (mount volumes here; see deploy/agent/compose.yml):
 #   /app/data                 SQLite (assessments.db, agent_sessions.db), range baselines
-#   /app/outputs              per-run report.json / report.md / manifest.json
+#   /app/outputs              per-run agent_report / deterministic_report / comparison
+#                             (.json + .md) and manifest.json
 #   /home/agent/.cache/trivy  Trivy vulnerability DB + layer cache
 VOLUME ["/app/data", "/app/outputs", "/home/agent/.cache/trivy"]
 

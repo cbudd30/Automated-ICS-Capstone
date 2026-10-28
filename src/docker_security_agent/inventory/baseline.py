@@ -24,6 +24,10 @@ labels including compose's config hash, volume set, container state - must match
 ``since`` adds a freshness check: every container and volume must have been
 created after the reset started. That catches a reset that skipped restoring
 a volume (its old contents - e.g. a modified PLC program - would survive).
+``project`` limits that check to one compose project (what range.sh resets):
+other resources on the engine, such as the read-only proxy the verification
+itself runs through, legitimately predate the reset. They are still compared
+by the fingerprint.
 
 Files live in ``<data_dir>/range-baselines/<NAME>/`` (git-ignored):
 ``baseline.json`` (written once) and ``verifications/<timestamp>.json``.
@@ -47,6 +51,7 @@ _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 # Labels Docker Compose changes on every recreate without any config change.
 VOLATILE_LABELS = {"com.docker.compose.replace"}
+PROJECT_LABEL = "com.docker.compose.project"
 
 
 class RangeBaseline(BaseModel):
@@ -67,6 +72,7 @@ class RangeVerification(BaseModel):
     snapshot_id: str
     verified_at: datetime
     since: datetime | None  # reset start time, when freshness was checked
+    project: str | None = None  # compose project the freshness check covered (None = all)
     matches: bool
     differences: list[str]
 
@@ -142,20 +148,31 @@ def _created_before(created: str, since: datetime) -> bool:
 
 
 def verify(
-    baseline: RangeBaseline, snapshot: InventorySnapshot, since: datetime | None = None
+    baseline: RangeBaseline,
+    snapshot: InventorySnapshot,
+    since: datetime | None = None,
+    project: str | None = None,
 ) -> RangeVerification:
     differences = [f"inventory incomplete: {e}" for e in snapshot.collection_errors]
     differences += diff(baseline.fingerprint, fingerprint(snapshot))
     if since is not None:
+
+        def in_scope(labels: dict[str, str]) -> bool:
+            return project is None or labels.get(PROJECT_LABEL) == project
+
+        containers = [c for c in snapshot.containers if in_scope(c.labels)]
+        volumes = [v for v in snapshot.volumes if in_scope(v.labels)]
+        if project is not None and not containers:
+            differences.append(f"no containers of compose project '{project}' found")
         differences += [
             f"containers.{c.name}: created {c.created or 'at an unknown time'}, before the reset"
-            for c in snapshot.containers
+            for c in containers
             if _created_before(c.created, since)
         ]
         differences += [
             f"volumes.{v.name}: created {v.created or 'at an unknown time'}, before the reset "
             "(contents were not restored)"
-            for v in snapshot.volumes
+            for v in volumes
             if _created_before(v.created, since)
         ]
     return RangeVerification(
@@ -164,6 +181,7 @@ def verify(
         snapshot_id=snapshot.snapshot_id,
         verified_at=datetime.now(UTC),
         since=since,
+        project=project if since is not None else None,
         matches=not differences,
         differences=differences,
     )
