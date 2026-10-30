@@ -70,7 +70,8 @@ dkr() {
   if [[ -n "${GRFICS_DOCKER_HOST:-}" ]]; then
     DOCKER_HOST="$GRFICS_DOCKER_HOST" docker "$@"
   else
-    env -u DOCKER_HOST docker "$@"
+    # Not `env -u`: uv installs a ~/.local/bin/env script that can shadow it.
+    (unset DOCKER_HOST; docker "$@")
   fi
 }
 compose() { dkr compose "${COMPOSE_ARGS[@]}" "$@"; }

@@ -16,21 +16,25 @@ Architecture
 * **MCP tools** — only ``do-nmap`` from the ``nmap`` server (see mcp_servers.yaml).
   Every call is guarded by ``GuardedMCPServer`` (policy + tool-call budget).
 * **ICS-safe by default** — instructions tell the agent to use ``-sT -T2`` and a
-  targeted ICS+IT port list.  The agent is told *never* to use aggressive timing
-  (T3+), OS detection (-O), or full-range sweeps without explicit permission.
+  targeted ICS+IT port list, plus one ``-sU -T2`` probe for BACnet/IP (UDP only).
+  The agent is told *never* to use aggressive timing (T3+), OS detection (-O),
+  or full-range sweeps without explicit permission.
 * **Structured output** — ``NmapNetworkAssessment`` via native JSON-schema mode
   (or prompted fallback for models that don't support it).
 
 Running
 -------
-    from docker_security_agent.agents.nmap_network_agent import run_nmap_agent_standalone
-    import asyncio
-    result = asyncio.run(run_nmap_agent_standalone(targets=["192.168.95.0/24"]))
-    print(result.assessment.model_dump_json(indent=2))
+From the CLI:
 
-Or from the CLI:
+    docker-audit nmap-scan --target 192.168.95.0/24
 
-    python -m docker_security_agent.cli.nmap_scan --target 192.168.95.0/24
+Or from code, with ``active_servers`` connected to the ``nmap`` MCP server (the
+``nmap-scan`` command in cli.py shows the full setup):
+
+    agent = build_nmap_agent(bundle, mcp_servers=active_servers)
+    user_input = build_nmap_input(["192.168.95.0/24"])
+    outcome = await run_nmap_agent(agent, user_input)
+    print(outcome.assessment.model_dump_json(indent=2))
 """
 
 from __future__ import annotations
@@ -47,7 +51,6 @@ from agents.exceptions import AgentsException, MaxTurnsExceeded
 
 from docker_security_agent import PROMPT_VERSION
 from docker_security_agent.llm.factory import ModelBundle
-from docker_security_agent.mcp.recorder import ToolCallRecorder
 from docker_security_agent.mcp.servers import GuardedMCPServer
 from docker_security_agent.schemas.nmap_network import NmapNetworkAssessment
 
@@ -63,7 +66,7 @@ ICS_PORTS = [
     ("4840", "OPC UA"),
     ("20000", "DNP3"),
     ("44818", "EtherNet/IP"),
-    ("47808", "BACnet/IP"),
+    ("47808", "BACnet/IP (normally UDP; see the WORKFLOW probe)"),
     ("9600", "OMRON FINS"),
     ("1911", "Niagara Fox"),
     ("2222", "EtherNet/IP (alt)"),
@@ -105,11 +108,12 @@ TOOL: do-nmap
 
 ICS-SAFE SCANNING RULES  ← you MUST follow these on every scan
 ---------------------------------------------------------------
-1. Always use TCP connect scan: include -sT in your flags.
+1. Always use TCP connect scan: include -sT in your flags. The only exception
+   is the BACnet/IP UDP probe in the WORKFLOW section.
 2. Always use polite timing:    include -T2 in your flags.
 3. Never use -T3, -T4, or -T5 on ICS/OT networks — they can crash PLCs.
-4. Never use OS detection (-O) or script engine (-A) in one shot — use
-   targeted NSE scripts only: -sV --version-intensity 2
+4. Never use OS detection (-O) or aggressive mode (-A). For service versions use
+   -sV --version-intensity 2. Run only the NSE scripts named in the WORKFLOW section.
 5. Limit port range to the list below unless the user explicitly extends it.
 6. Never scan a /16 or larger subnet — refuse and explain why.
 7. One target per do-nmap call; scan subnets before individual hosts.
@@ -131,10 +135,17 @@ WORKFLOW
 2. For each target subnet/host, call do-nmap with ICS-safe flags.
 3. If ICS ports are open on a host, call do-nmap again on that host with
    ICS-specific NSE scripts:
-     -sT -T2 -p {_ICS_PORT_STR} --script modbus-discover,s7-info,enip-info,dnp3-info,bacnet-info --open
-4. Stop when you have scanned all targets and gathered enough evidence for
+     -sT -T2 -p {_ICS_PORT_STR} --script modbus-discover,s7-info,enip-info,dnp3-info --open
+4. BACnet/IP normally runs over UDP, so TCP scans will not find it. Call do-nmap
+   once per target for it, even if no ICS ports were found:
+     -sU -T2 -p 47808 --script bacnet-info --open
+   - Treat BACnet as confirmed only if bacnet-info returns device data. Record a
+     bare open|filtered result in `limitations`, not as a finding.
+   - If the scan fails for lack of privileges, do not retry it. Record in
+     `limitations` that BACnet/IP over UDP was not assessed.
+5. Stop when you have scanned all targets and gathered enough evidence for
    a complete assessment. Do NOT re-scan the same host without a reason.
-5. Produce the final NmapNetworkAssessment.
+6. Produce the final NmapNetworkAssessment.
 
 ASSESSMENT RULES
 ---------------------------------------------------------------

@@ -85,7 +85,8 @@ servers:
   # Requires: nmap on the host, NMAP_PATH env var pointing to the binary.
   #
   # ICS safety: the NmapNetworkAgent is instructed to use only ICS-safe flags
-  # (-sT -T2, targeted port list). These are enforced via agent instructions, so
+  # (-sT -T2, targeted port list, one -sU -T2 probe for BACnet/IP). These are
+  # enforced via agent instructions, so
   # exercise caution on live OT networks.
   #
   # To disable this agent, set enabled: false below.

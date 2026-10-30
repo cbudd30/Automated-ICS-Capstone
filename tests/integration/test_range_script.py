@@ -54,7 +54,7 @@ def env(tmp_path):
     data = tmp_path / "data"
     log = tmp_path / "calls.log"
     e = {
-        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "HOME": str(tmp_path),
         "FAKE_LOG": str(log),
         "GRFICS_DIR": str(grfics),
@@ -137,7 +137,7 @@ def test_reset_fails_when_lab_never_gets_healthy(env, tmp_path):
     e, data, log = env
     assert run(e, "save", "base1").returncode == 0
     (data / "range-baselines" / "base1" / "baseline.json").write_text("{}")
-    docker = Path(e["PATH"].split(":")[0]) / "docker"
+    docker = tmp_path / "bin" / "docker"
     docker.write_text(docker.read_text().replace("hmi running ", "hmi running unhealthy"))
     e["RANGE_HEALTH_TIMEOUT"] = "0"
     r = run(e, "reset", "base1")

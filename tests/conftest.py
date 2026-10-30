@@ -42,6 +42,7 @@ def fake_mcp_settings(settings: Settings, tmp_path: Path) -> Settings:
     """Point both MCP servers at the fake stdio server (no Docker/Trivy needed)."""
     script = str(FIXTURES / "fake_mcp_server.py")
     call_log = tmp_path / "mcp_calls.jsonl"
+    settings.mcp.servers["nmap"].enabled = False  # no fake for it; never start the real one
     for name, kind in (("docker", "docker"), ("trivy", "trivy")):
         cfg = settings.mcp.servers[name]
         cfg.command = sys.executable
