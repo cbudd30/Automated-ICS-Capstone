@@ -1,0 +1,65 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261028-165254-bc20",
+  "generated_at": "2026-10-28T16:57:20.259239Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.2,
+      "max_tokens": null,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "prompt_version": "v5",
+  "agent_status": "error",
+  "snapshot_id": "snap-f15452669668365a",
+  "executive_summary": "The agent produced no valid assessment (status: error). See errors below.",
+  "overall_risk": null,
+  "findings": [],
+  "rejected": [],
+  "out_of_scope": [],
+  "recommendations": [],
+  "limitations": [],
+  "validation_notes": [],
+  "errors": [
+    "agent: ModelBehaviorError: Chat Completions response terminated with finish_reason='length' but produced no assistant text, tool call, or refusal."
+  ],
+  "metrics": {
+    "started_at": "2026-10-28T16:52:54.429132Z",
+    "finished_at": "2026-10-28T16:57:20.249163Z",
+    "duration_seconds": 265.82,
+    "collection_seconds": 0.91,
+    "scan_seconds": 21.8,
+    "agent_seconds": 242.5,
+    "tool_calls_total": 465,
+    "tool_calls_agent": 12,
+    "tool_calls_blocked": 1,
+    "tool_calls_by_name": {
+      "docker.system_version": 1,
+      "docker.container_list": 2,
+      "docker.image_list": 2,
+      "docker.network_list": 1,
+      "docker.volume_list": 1,
+      "trivy.trivy_version": 1,
+      "trivy.scan_image": 11,
+      "trivy.findings_list": 439,
+      "docker.container_inspect": 4,
+      "docker.image_inspect": 3
+    },
+    "redactions": 289,
+    "model_requests": 12,
+    "input_tokens": 197501,
+    "output_tokens": 7223,
+    "total_tokens": 204724
+  }
+}

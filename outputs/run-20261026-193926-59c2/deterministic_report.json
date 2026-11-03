@@ -1,0 +1,4165 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261026-193926-59c2",
+  "status": "completed",
+  "objective": "Assess the security posture of the Docker environment hosting a containerized industrial control system (ICS) lab. Identify container misconfigurations, risky network exposure, missing resource limits, and known image vulnerabilities. Prioritise risks by their impact on an OT environment and give concrete, evidence-based remediation for defenders.",
+  "generated_at": "2026-10-26T19:42:58.446962Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.2,
+      "max_tokens": null,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "prompt_version": "v4",
+  "mcp_servers": [
+    {
+      "name": "docker",
+      "role": "docker_inspection",
+      "command": "uvx docker-mcp-server==2.2.7",
+      "version": "docker-mcp-server==2.2.7",
+      "approved_tools": [
+        "container_list",
+        "container_inspect",
+        "image_list",
+        "image_inspect",
+        "image_history",
+        "network_list",
+        "network_inspect",
+        "volume_list",
+        "volume_inspect",
+        "system_info",
+        "system_version"
+      ],
+      "connected": true,
+      "error": null
+    },
+    {
+      "name": "trivy",
+      "role": "image_scanner",
+      "command": "trivy mcp --transport stdio",
+      "version": "v0.68.2",
+      "approved_tools": [
+        "scan_image",
+        "findings_list",
+        "findings_get",
+        "trivy_version"
+      ],
+      "connected": true,
+      "error": null
+    }
+  ],
+  "docker_endpoint": {
+    "docker_host": "tcp://127.0.0.1:2375",
+    "require_proxy": true,
+    "proxy_verified": true,
+    "docker_version": "29.7.2"
+  },
+  "manifest_sha256": "7c2f0db38afefd00f21323077cd787613481808906821c57e331f5a2e612c2fd",
+  "config_sha256": "a35a421b2acf8a4e39b2f986a39911a03a102dcbde486e8a11a714ea89287637",
+  "snapshot_id": "snap-42ec19bd1e402794",
+  "snapshot_captured_at": "2026-10-26T19:39:27.504713Z",
+  "docker_version": "29.7.2",
+  "docker_platform": "Docker Desktop 4.88.1 (237512)",
+  "summary": {
+    "overall_risk": "critical",
+    "executive_summary": "Deterministic checks (rules and Trivy) produced 85 findings (7 critical, 1 high, 25 medium, 42 low, 10 info). No AI was involved in this report.",
+    "containers_total": 8,
+    "containers_running": 8,
+    "images_total": 52,
+    "networks_total": 9,
+    "volumes_total": 22,
+    "findings_by_severity": {
+      "critical": 7,
+      "high": 1,
+      "medium": 25,
+      "low": 42,
+      "info": 10
+    },
+    "vulnerable_images": 7,
+    "total_vulnerabilities": {
+      "CRITICAL": 235,
+      "HIGH": 4012,
+      "MEDIUM": 11924,
+      "LOW": 5141,
+      "UNKNOWN": 326
+    }
+  },
+  "containers": [
+    {
+      "name": "EWS",
+      "image": "fortiphyd/grfics-workstation",
+      "state": "running",
+      "user": "root",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_b-ics-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:6080->6080/tcp"
+      ],
+      "finding_count": 10
+    },
+    {
+      "name": "HMI",
+      "image": "fortiphyd/grfics-scadalts",
+      "state": "running",
+      "user": "(default: root)",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_c-dmz-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:6081->8080/tcp"
+      ],
+      "finding_count": 10
+    },
+    {
+      "name": "caldera",
+      "image": "fortiphyd/grfics-caldera",
+      "state": "running",
+      "user": "(default: root)",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_c-dmz-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:8888->8888/tcp"
+      ],
+      "finding_count": 7
+    },
+    {
+      "name": "docker-audit-socket-proxy",
+      "image": "tecnativa/docker-socket-proxy:v0.5.0",
+      "state": "running",
+      "user": "root",
+      "privileged": false,
+      "networks": [
+        "docker-audit-mgmt",
+        "docker-audit-proxy_default"
+      ],
+      "published_ports": [
+        "127.0.0.1:2375->2375/tcp"
+      ],
+      "finding_count": 0
+    },
+    {
+      "name": "kali",
+      "image": "fortiphyd/grfics-attacker",
+      "state": "running",
+      "user": "root",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_c-dmz-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:6088->6080/tcp"
+      ],
+      "finding_count": 10
+    },
+    {
+      "name": "plc",
+      "image": "fortiphyd/grfics-plc",
+      "state": "running",
+      "user": "(default: root)",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_b-ics-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:8080->8080/tcp"
+      ],
+      "finding_count": 9
+    },
+    {
+      "name": "router",
+      "image": "fortiphyd/grfics-router",
+      "state": "running",
+      "user": "(default: root)",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_b-ics-net",
+        "grficsv3_c-dmz-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:51820->51820/udp"
+      ],
+      "finding_count": 10
+    },
+    {
+      "name": "simulation",
+      "image": "fortiphyd/grfics-simulation",
+      "state": "running",
+      "user": "(default: root)",
+      "privileged": false,
+      "networks": [
+        "grficsv3_a-grfics-admin",
+        "grficsv3_b-ics-net"
+      ],
+      "published_ports": [
+        "0.0.0.0:80->80/tcp"
+      ],
+      "finding_count": 10
+    }
+  ],
+  "images": [
+    {
+      "name": "fortiphyd/grfics-workstation:latest",
+      "id": "0e9f4e94459b",
+      "digest": "fortiphyd/grfics-workstation@sha256:0e9f4e94459b37f0d790cd3c8f1cade609dd8f14fbfc1fa07105c1d9df62b5b4",
+      "created": "2026-10-20T21:20:47",
+      "size_mb": 1851.2,
+      "used_by": [
+        "EWS"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 36,
+        "HIGH": 704,
+        "MEDIUM": 2175,
+        "LOW": 1218,
+        "UNKNOWN": 8
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "tecnativa/docker-socket-proxy:v0.5.0",
+      "id": "1f5038b54f06",
+      "digest": "tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459",
+      "created": "2026-07-27T09:28:37",
+      "size_mb": 20.6,
+      "used_by": [
+        "docker-audit-socket-proxy"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 0,
+        "HIGH": 6,
+        "MEDIUM": 10,
+        "LOW": 13,
+        "UNKNOWN": 0
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "fortiphyd/grfics-attacker:latest",
+      "id": "6cd239bfad70",
+      "digest": "fortiphyd/grfics-attacker@sha256:6cd239bfad704904054275db07f486d1531e4e61781a7bff3603af428e9b3d8b",
+      "created": "2026-10-20T21:03:53",
+      "size_mb": 1678.3,
+      "used_by": [
+        "kali"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 0,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "LOW": 0,
+        "UNKNOWN": 0
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "fortiphyd/grfics-plc:latest",
+      "id": "7397c8440578",
+      "digest": "fortiphyd/grfics-plc@sha256:7397c8440578dd8e9ff01133445ed264f1166beb5f00fc72d476d738b9797987",
+      "created": "2026-10-20T21:08:45",
+      "size_mb": 356.8,
+      "used_by": [
+        "plc"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 55,
+        "HIGH": 1544,
+        "MEDIUM": 6197,
+        "LOW": 2083,
+        "UNKNOWN": 121
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "fortiphyd/grfics-scadalts:latest",
+      "id": "83f3f576e769",
+      "digest": "fortiphyd/grfics-scadalts@sha256:83f3f576e769cb6878ee1188ee8ae79708a1efb5260a4c22022ba0b3171b1bbe",
+      "created": "2026-10-20T21:16:25",
+      "size_mb": 568.2,
+      "used_by": [
+        "HMI"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 47,
+        "HIGH": 92,
+        "MEDIUM": 146,
+        "LOW": 55,
+        "UNKNOWN": 0
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "fortiphyd/grfics-router:latest",
+      "id": "9b9a167e5c78",
+      "digest": "fortiphyd/grfics-router@sha256:9b9a167e5c78c933a44af0f47f62f6071294aac435e9f8f472a94d33396a94f3",
+      "created": "2026-10-20T21:15:27",
+      "size_mb": 74.8,
+      "used_by": [
+        "router"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 5,
+        "HIGH": 190,
+        "MEDIUM": 354,
+        "LOW": 247,
+        "UNKNOWN": 2
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "fortiphyd/grfics-caldera:latest",
+      "id": "a7a3edc9ef16",
+      "digest": "fortiphyd/grfics-caldera@sha256:a7a3edc9ef1661a3d0fbb8ad4fa40540490bc5d50ace08ba363bc36f07c1d5e1",
+      "created": "2026-10-20T21:11:24",
+      "size_mb": 2603.5,
+      "used_by": [
+        "caldera"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 85,
+        "HIGH": 1319,
+        "MEDIUM": 2796,
+        "LOW": 1247,
+        "UNKNOWN": 187
+      },
+      "scan_status": "ok"
+    },
+    {
+      "name": "fortiphyd/grfics-simulation:latest",
+      "id": "ed3517811da2",
+      "digest": "fortiphyd/grfics-simulation@sha256:ed3517811da2c4a542bf28b5f19f939ade8aa4d7ab1ac2de63c16087b34dd756",
+      "created": "2026-10-20T21:14:36",
+      "size_mb": 603.5,
+      "used_by": [
+        "simulation"
+      ],
+      "vuln_counts": {
+        "CRITICAL": 7,
+        "HIGH": 157,
+        "MEDIUM": 246,
+        "LOW": 278,
+        "UNKNOWN": 8
+      },
+      "scan_status": "ok"
+    }
+  ],
+  "networks": [
+    {
+      "name": "bridge",
+      "driver": "bridge",
+      "internal": false,
+      "subnets": [
+        "172.17.0.0/16"
+      ],
+      "containers": []
+    },
+    {
+      "name": "docker-audit-agent_default",
+      "driver": "bridge",
+      "internal": false,
+      "subnets": [
+        "172.22.0.0/16"
+      ],
+      "containers": []
+    },
+    {
+      "name": "docker-audit-mgmt",
+      "driver": "bridge",
+      "internal": true,
+      "subnets": [
+        "172.21.0.0/16"
+      ],
+      "containers": [
+        "docker-audit-socket-proxy"
+      ]
+    },
+    {
+      "name": "docker-audit-proxy_default",
+      "driver": "bridge",
+      "internal": false,
+      "subnets": [
+        "172.19.0.0/16"
+      ],
+      "containers": [
+        "docker-audit-socket-proxy"
+      ]
+    },
+    {
+      "name": "grficsv3_a-grfics-admin",
+      "driver": "bridge",
+      "internal": false,
+      "subnets": [
+        "172.18.0.0/16"
+      ],
+      "containers": [
+        "EWS",
+        "HMI",
+        "caldera",
+        "kali",
+        "plc",
+        "router",
+        "simulation"
+      ]
+    },
+    {
+      "name": "grficsv3_b-ics-net",
+      "driver": "bridge",
+      "internal": false,
+      "subnets": [
+        "192.168.95.0/24"
+      ],
+      "containers": [
+        "EWS",
+        "plc",
+        "router",
+        "simulation"
+      ]
+    },
+    {
+      "name": "grficsv3_c-dmz-net",
+      "driver": "bridge",
+      "internal": false,
+      "subnets": [
+        "192.168.90.0/24"
+      ],
+      "containers": [
+        "HMI",
+        "caldera",
+        "kali",
+        "router"
+      ]
+    },
+    {
+      "name": "host",
+      "driver": "host",
+      "internal": false,
+      "subnets": [],
+      "containers": []
+    },
+    {
+      "name": "none",
+      "driver": "null",
+      "internal": false,
+      "subnets": [],
+      "containers": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-V001-ec328b84bb",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (85 CRITICAL, 1319 HIGH, 2796 MEDIUM, 1247 LOW, 187 UNKNOWN)",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-caldera:latest",
+      "resource_id": "sha256:a7a3edc9ef1661a3d0fbb8ad4fa40540490bc5d50ace08ba363bc36f07c1d5e1",
+      "category": "image-vulnerability",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "counts",
+          "value": "85 CRITICAL, 1319 HIGH, 2796 MEDIUM, 1247 LOW, 187 UNKNOWN",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "gobinary/stdlib",
+          "value": "CVE-2022-23806 CRITICAL installed=v1.16.3 fixed=1.16.14, 1.17.7",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "gobinary/stdlib",
+          "value": "CVE-2022-23806 CRITICAL installed=v1.15.9 fixed=1.16.14, 1.17.7",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "gobinary/stdlib",
+          "value": "CVE-2022-23806 CRITICAL installed=v1.15.9 fixed=1.16.14, 1.17.7",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "gobinary/stdlib",
+          "value": "CVE-2022-23806 CRITICAL installed=v1.13 fixed=1.16.14, 1.17.7",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "gobinary/stdlib",
+          "value": "CVE-2022-23806 CRITICAL installed=v1.15.9 fixed=1.16.14, 1.17.7",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 5634 known vulnerabilities in packages of this image (2492 have a fixed version available). Image used by: caldera. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2022-23806",
+        "https://avd.aquasec.com/nvd/cve-2022-23806",
+        "https://avd.aquasec.com/nvd/cve-2022-23806",
+        "https://avd.aquasec.com/nvd/cve-2022-23806",
+        "https://avd.aquasec.com/nvd/cve-2022-23806"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-V001-5c7f29bdf3",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (55 CRITICAL, 1544 HIGH, 6197 MEDIUM, 2083 LOW, 121 UNKNOWN)",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "resource_id": "sha256:7397c8440578dd8e9ff01133445ed264f1166beb5f00fc72d476d738b9797987",
+      "category": "image-vulnerability",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "counts",
+          "value": "55 CRITICAL, 1544 HIGH, 6197 MEDIUM, 2083 LOW, 121 UNKNOWN",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "debian/python3.9-dev",
+          "value": "CVE-2021-29921 CRITICAL installed=3.9.2-1 fixed=3.9.2-1+deb11u2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "debian/libpython3.9-stdlib",
+          "value": "CVE-2021-29921 CRITICAL installed=3.9.2-1 fixed=3.9.2-1+deb11u2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "debian/python3.9-venv",
+          "value": "CVE-2021-29921 CRITICAL installed=3.9.2-1 fixed=3.9.2-1+deb11u2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "debian/libpython3.9-dev",
+          "value": "CVE-2021-29921 CRITICAL installed=3.9.2-1 fixed=3.9.2-1+deb11u2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "debian/python3.9-minimal",
+          "value": "CVE-2021-29921 CRITICAL installed=3.9.2-1 fixed=3.9.2-1+deb11u2",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 10000 known vulnerabilities in packages of this image (3438 have a fixed version available). Image used by: plc. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2021-29921",
+        "https://avd.aquasec.com/nvd/cve-2021-29921",
+        "https://avd.aquasec.com/nvd/cve-2021-29921",
+        "https://avd.aquasec.com/nvd/cve-2021-29921",
+        "https://avd.aquasec.com/nvd/cve-2021-29921"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-V001-c66c18dcb1",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (5 CRITICAL, 190 HIGH, 354 MEDIUM, 247 LOW, 2 UNKNOWN)",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-router:latest",
+      "resource_id": "sha256:9b9a167e5c78c933a44af0f47f62f6071294aac435e9f8f472a94d33396a94f3",
+      "category": "image-vulnerability",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "counts",
+          "value": "5 CRITICAL, 190 HIGH, 354 MEDIUM, 247 LOW, 2 UNKNOWN",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "debian/perl-base",
+          "value": "CVE-2026-13221 CRITICAL installed=5.36.0-7+deb12u3 fixed=5.36.0-7+deb12u4",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "debian/perl-base",
+          "value": "CVE-2026-42496 CRITICAL installed=5.36.0-7+deb12u3 fixed=5.36.0-7+deb12u4",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "debian/perl-base",
+          "value": "CVE-2026-8376 CRITICAL installed=5.36.0-7+deb12u3 fixed=5.36.0-7+deb12u4",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "debian/zlib1g",
+          "value": "CVE-2023-45853 CRITICAL installed=1:1.2.13.dfsg-1 fixed=none",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "debian/libsqlite3-0",
+          "value": "CVE-2025-7458 CRITICAL installed=3.40.1-2+deb12u2 fixed=none",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 798 known vulnerabilities in packages of this image (13 have a fixed version available). Image used by: router. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2026-13221",
+        "https://avd.aquasec.com/nvd/cve-2026-42496",
+        "https://avd.aquasec.com/nvd/cve-2026-8376",
+        "https://avd.aquasec.com/nvd/cve-2023-45853",
+        "https://avd.aquasec.com/nvd/cve-2025-7458"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-V001-885cc6c80e",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (47 CRITICAL, 92 HIGH, 146 MEDIUM, 55 LOW)",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-scadalts:latest",
+      "resource_id": "sha256:83f3f576e769cb6878ee1188ee8ae79708a1efb5260a4c22022ba0b3171b1bbe",
+      "category": "image-vulnerability",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "counts",
+          "value": "47 CRITICAL, 92 HIGH, 146 MEDIUM, 55 LOW",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "jar/org.apache.derby:derby",
+          "value": "CVE-2015-1832 CRITICAL installed=10.6.1.0 fixed=10.12.1.1",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "jar/org.springframework:spring-web",
+          "value": "CVE-2016-1000027 CRITICAL installed=4.3.16.RELEASE fixed=6.0.0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "jar/commons-fileupload:commons-fileupload",
+          "value": "CVE-2016-1000031 CRITICAL installed=1.3.2 fixed=1.3.3",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "jar/com.fasterxml.jackson.core:jackson-databind",
+          "value": "CVE-2017-15095 CRITICAL installed=2.8.2 fixed=2.8.11, 2.9.4, 2.6.7.3, 2.7.9.2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "jar/com.fasterxml.jackson.core:jackson-databind",
+          "value": "CVE-2017-17485 CRITICAL installed=2.8.2 fixed=2.9.4, 2.8.11, 2.7.9.2",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 340 known vulnerabilities in packages of this image (229 have a fixed version available). Image used by: HMI. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2015-1832",
+        "https://avd.aquasec.com/nvd/cve-2016-1000027",
+        "https://avd.aquasec.com/nvd/cve-2016-1000031",
+        "https://avd.aquasec.com/nvd/cve-2017-15095",
+        "https://avd.aquasec.com/nvd/cve-2017-17485"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-V001-e3f7e95629",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (7 CRITICAL, 157 HIGH, 246 MEDIUM, 278 LOW, 8 UNKNOWN)",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-simulation:latest",
+      "resource_id": "sha256:ed3517811da2c4a542bf28b5f19f939ade8aa4d7ab1ac2de63c16087b34dd756",
+      "category": "image-vulnerability",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "counts",
+          "value": "7 CRITICAL, 157 HIGH, 246 MEDIUM, 278 LOW, 8 UNKNOWN",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "debian/openssl",
+          "value": "CVE-2026-31789 CRITICAL installed=3.0.16-1~deb12u1 fixed=3.0.19-1~deb12u2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "debian/libssl3",
+          "value": "CVE-2026-31789 CRITICAL installed=3.0.16-1~deb12u1 fixed=3.0.19-1~deb12u2",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "debian/libgnutls30",
+          "value": "CVE-2026-33845 CRITICAL installed=3.7.9-2+deb12u4 fixed=3.7.9-2+deb12u7",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "debian/libgnutls30",
+          "value": "CVE-2026-42010 CRITICAL installed=3.7.9-2+deb12u4 fixed=3.7.9-2+deb12u7",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "debian/zlib1g",
+          "value": "CVE-2023-45853 CRITICAL installed=1:1.2.13.dfsg-1 fixed=none",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 696 known vulnerabilities in packages of this image (144 have a fixed version available). Image used by: simulation. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2026-31789",
+        "https://avd.aquasec.com/nvd/cve-2026-31789",
+        "https://avd.aquasec.com/nvd/cve-2026-33845",
+        "https://avd.aquasec.com/nvd/cve-2026-42010",
+        "https://avd.aquasec.com/nvd/cve-2023-45853"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-V001-9e8f54fed8",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (36 CRITICAL, 704 HIGH, 2175 MEDIUM, 1218 LOW, 8 UNKNOWN)",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "resource_id": "sha256:0e9f4e94459b37f0d790cd3c8f1cade609dd8f14fbfc1fa07105c1d9df62b5b4",
+      "category": "image-vulnerability",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "counts",
+          "value": "36 CRITICAL, 704 HIGH, 2175 MEDIUM, 1218 LOW, 8 UNKNOWN",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "gobinary/github.com/go-git/go-git/v5",
+          "value": "CVE-2023-49569 CRITICAL installed=v5.4.2 fixed=5.11.0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "gobinary/github.com/go-git/go-git/v5",
+          "value": "CVE-2023-49569 CRITICAL installed=v5.4.2 fixed=5.11.0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "gobinary/github.com/go-git/go-git/v5",
+          "value": "CVE-2023-49569 CRITICAL installed=v5.4.2 fixed=5.11.0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "gobinary/github.com/go-git/go-git/v5",
+          "value": "CVE-2023-49569 CRITICAL installed=v5.4.2 fixed=5.11.0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "gobinary/stdlib",
+          "value": "CVE-2024-24790 CRITICAL installed=v1.21.6 fixed=1.21.11, 1.22.4",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 4141 known vulnerabilities in packages of this image (656 have a fixed version available). Image used by: EWS. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2023-49569",
+        "https://avd.aquasec.com/nvd/cve-2023-49569",
+        "https://avd.aquasec.com/nvd/cve-2023-49569",
+        "https://avd.aquasec.com/nvd/cve-2023-49569",
+        "https://avd.aquasec.com/nvd/cve-2024-24790"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C008-8156eaec96",
+      "rule_id": "C008",
+      "title": "Docker socket is mounted into the container",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "filesystem",
+      "severity": "critical",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "Mounts",
+          "value": "/var/run/docker.sock -> /var/run/docker.sock (rw)",
+          "note": "even a read-only mount of the socket allows full API use"
+        }
+      ],
+      "explanation": "The Docker API socket grants full control of the Docker daemon: anyone who controls this container can start a privileged container that mounts the host filesystem, i.e. root on the host and control of every ICS component. Mounting it ':ro' does NOT help - it only makes the socket file read-only, not the API.",
+      "remediation": "Remove the socket mount. If the service needs Docker metadata (e.g. a version/status page), give it a filtered read-only proxy such as tecnativa/docker-socket-proxy with POST=0 and only the needed API sections.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-V001-2b857d3575",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (6 HIGH, 10 MEDIUM, 13 LOW)",
+      "resource_type": "image",
+      "resource_name": "tecnativa/docker-socket-proxy:v0.5.0",
+      "resource_id": "sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459",
+      "category": "image-vulnerability",
+      "severity": "high",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "scanner",
+      "evidence": [
+        {
+          "source": "trivy",
+          "resource": "tecnativa/docker-socket-proxy:v0.5.0",
+          "path": "counts",
+          "value": "6 HIGH, 10 MEDIUM, 13 LOW",
+          "note": "scanner trivy v0.68.2"
+        },
+        {
+          "source": "trivy",
+          "resource": "tecnativa/docker-socket-proxy:v0.5.0",
+          "path": "alpine/pcre2",
+          "value": "CVE-2026-103111 HIGH installed=10.47-r1 fixed=10.49-r0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "tecnativa/docker-socket-proxy:v0.5.0",
+          "path": "alpine/libcrypto3",
+          "value": "CVE-2026-14456 HIGH installed=3.5.7-r0 fixed=3.5.8-r0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "tecnativa/docker-socket-proxy:v0.5.0",
+          "path": "alpine/libssl3",
+          "value": "CVE-2026-14456 HIGH installed=3.5.7-r0 fixed=3.5.8-r0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "tecnativa/docker-socket-proxy:v0.5.0",
+          "path": "alpine/pcre2",
+          "value": "CVE-2026-86145 HIGH installed=10.47-r1 fixed=10.48-r0",
+          "note": ""
+        },
+        {
+          "source": "trivy",
+          "resource": "tecnativa/docker-socket-proxy:v0.5.0",
+          "path": "alpine/pcre2",
+          "value": "CVE-2026-89157 HIGH installed=10.47-r1 fixed=10.48-r0",
+          "note": ""
+        }
+      ],
+      "explanation": "Trivy matched 29 known vulnerabilities in packages of this image (29 have a fixed version available). Image used by: docker-audit-socket-proxy. Exploitability depends on whether the vulnerable package is reachable from an exposed service.",
+      "remediation": "Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+      "references": [
+        "https://avd.aquasec.com/nvd/cve-2026-103111",
+        "https://avd.aquasec.com/nvd/cve-2026-14456",
+        "https://avd.aquasec.com/nvd/cve-2026-14456",
+        "https://avd.aquasec.com/nvd/cve-2026-86145",
+        "https://avd.aquasec.com/nvd/cve-2026-89157"
+      ],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C002-383abc283c",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_ADMIN",
+          "note": "can reconfigure interfaces, routes and firewall rules"
+        }
+      ],
+      "explanation": "Added capabilities widen what a compromised process can do to the host kernel and network. In an OT lab, NET_ADMIN/NET_RAW on hosts attached to the process network allow traffic manipulation between PLCs and HMIs.",
+      "remediation": "Remove capabilities that are not strictly required. Start from `cap_drop: [ALL]` and add back only what the service needs; if NET_ADMIN is only used at start-up (e.g. to add routes), configure networking outside the container instead.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-255ad39f7d",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "Config.User",
+          "value": "root",
+          "note": "Config.User"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C002-3bf07d0e81",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_ADMIN",
+          "note": "can reconfigure interfaces, routes and firewall rules"
+        }
+      ],
+      "explanation": "Added capabilities widen what a compromised process can do to the host kernel and network. In an OT lab, NET_ADMIN/NET_RAW on hosts attached to the process network allow traffic manipulation between PLCs and HMIs.",
+      "remediation": "Remove capabilities that are not strictly required. Start from `cap_drop: [ALL]` and add back only what the service needs; if NET_ADMIN is only used at start-up (e.g. to add routes), configure networking outside the container instead.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-9b67810909",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "Config.User",
+          "value": "<empty>",
+          "note": "not set (defaults to root)"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-91987dbd22",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "Config.User",
+          "value": "<empty>",
+          "note": "not set (defaults to root)"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C002-11ce7daa2d",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_ADMIN",
+          "note": "can reconfigure interfaces, routes and firewall rules"
+        }
+      ],
+      "explanation": "Added capabilities widen what a compromised process can do to the host kernel and network. In an OT lab, NET_ADMIN/NET_RAW on hosts attached to the process network allow traffic manipulation between PLCs and HMIs.",
+      "remediation": "Remove capabilities that are not strictly required. Start from `cap_drop: [ALL]` and add back only what the service needs; if NET_ADMIN is only used at start-up (e.g. to add routes), configure networking outside the container instead.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-205593608c",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "Config.User",
+          "value": "root",
+          "note": "Config.User"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C002-a9137c7b7f",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_ADMIN",
+          "note": "can reconfigure interfaces, routes and firewall rules"
+        }
+      ],
+      "explanation": "Added capabilities widen what a compromised process can do to the host kernel and network. In an OT lab, NET_ADMIN/NET_RAW on hosts attached to the process network allow traffic manipulation between PLCs and HMIs.",
+      "remediation": "Remove capabilities that are not strictly required. Start from `cap_drop: [ALL]` and add back only what the service needs; if NET_ADMIN is only used at start-up (e.g. to add routes), configure networking outside the container instead.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-e1e6ceccb1",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "Config.User",
+          "value": "<empty>",
+          "note": "not set (defaults to root)"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C002-541155100b",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN, NET_RAW",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_ADMIN",
+          "note": "can reconfigure interfaces, routes and firewall rules"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_RAW",
+          "note": "can craft raw packets (spoofing, ARP poisoning on the ICS segment)"
+        }
+      ],
+      "explanation": "Added capabilities widen what a compromised process can do to the host kernel and network. In an OT lab, NET_ADMIN/NET_RAW on hosts attached to the process network allow traffic manipulation between PLCs and HMIs.",
+      "remediation": "Remove capabilities that are not strictly required. Start from `cap_drop: [ALL]` and add back only what the service needs; if NET_ADMIN is only used at start-up (e.g. to add routes), configure networking outside the container instead.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-8946ab56f6",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "Config.User",
+          "value": "<empty>",
+          "note": "not set (defaults to root)"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N003-d06c0ca54d",
+      "rule_id": "N003",
+      "title": "IP forwarding enabled inside the container",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.Sysctls.net.ipv4.ip_forward",
+          "value": "1",
+          "note": ""
+        }
+      ],
+      "explanation": "The container routes packets between its interfaces. Expected for a router/firewall container, but it makes this container a critical segmentation control: its rule set and hardening determine whether zones are actually isolated.",
+      "remediation": "Confirm this container is the intended router; harden and monitor it, restrict its management interface, and disable forwarding elsewhere.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C002-6aafad366c",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.CapAdd",
+          "value": "NET_ADMIN",
+          "note": "can reconfigure interfaces, routes and firewall rules"
+        }
+      ],
+      "explanation": "Added capabilities widen what a compromised process can do to the host kernel and network. In an OT lab, NET_ADMIN/NET_RAW on hosts attached to the process network allow traffic manipulation between PLCs and HMIs.",
+      "remediation": "Remove capabilities that are not strictly required. Start from `cap_drop: [ALL]` and add back only what the service needs; if NET_ADMIN is only used at start-up (e.g. to add routes), configure networking outside the container instead.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C003-1cd093f70a",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "privilege",
+      "severity": "medium",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "Config.User",
+          "value": "<empty>",
+          "note": "not set (defaults to root)"
+        }
+      ],
+      "explanation": "The main process runs as UID 0. Combined with any added capability, writable mount or kernel bug, root inside the container makes escape and host compromise significantly easier.",
+      "remediation": "Add a non-root `USER` to the Dockerfile (or `user: \"1000:1000\"` in compose) and fix file ownership so the service runs unprivileged. Consider user-namespace remapping (`userns-remap`) on the daemon.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-09a743e881",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.2",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "NetworkSettings.Networks.grficsv3_b-ics-net",
+          "value": "192.168.95.5",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-S001-0329c4a990",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: VNC_PASSWORD",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "secrets-hygiene",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "Config.Env",
+          "value": "VNC_PASSWORD=<redacted>",
+          "note": "value not collected"
+        }
+      ],
+      "explanation": "Secrets passed as environment variables are visible to anyone who can inspect the container (docker inspect, /proc/<pid>/environ) and often leak into logs and crash dumps. Values were redacted and not analysed; the name alone indicates a likely credential.",
+      "remediation": "Use Docker secrets / mounted secret files with restricted permissions, and rotate any credential that was exposed via the environment.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-7609984e56",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.5",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "NetworkSettings.Networks.grficsv3_c-dmz-net",
+          "value": "192.168.90.107",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-S001-f4fda064dc",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, TOMCAT_PASSWORD",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "secrets-hygiene",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "Config.Env",
+          "value": "MYSQL_PASSWORD=<redacted>",
+          "note": "value not collected"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "Config.Env",
+          "value": "MYSQL_ROOT_PASSWORD=<redacted>",
+          "note": "value not collected"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "Config.Env",
+          "value": "TOMCAT_PASSWORD=<redacted>",
+          "note": "value not collected"
+        }
+      ],
+      "explanation": "Secrets passed as environment variables are visible to anyone who can inspect the container (docker inspect, /proc/<pid>/environ) and often leak into logs and crash dumps. Values were redacted and not analysed; the name alone indicates a likely credential.",
+      "remediation": "Use Docker secrets / mounted secret files with restricted permissions, and rotate any credential that was exposed via the environment.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-8470cef167",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.7",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "NetworkSettings.Networks.grficsv3_c-dmz-net",
+          "value": "192.168.90.250",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-2aa37c4a27",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.8",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "NetworkSettings.Networks.grficsv3_c-dmz-net",
+          "value": "192.168.90.6",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-S001-e8d4932f0d",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: VNC_PASSWORD",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "secrets-hygiene",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "Config.Env",
+          "value": "VNC_PASSWORD=<redacted>",
+          "note": "value not collected"
+        }
+      ],
+      "explanation": "Secrets passed as environment variables are visible to anyone who can inspect the container (docker inspect, /proc/<pid>/environ) and often leak into logs and crash dumps. Values were redacted and not analysed; the name alone indicates a likely credential.",
+      "remediation": "Use Docker secrets / mounted secret files with restricted permissions, and rotate any credential that was exposed via the environment.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-3ec8fa3c85",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.3",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "NetworkSettings.Networks.grficsv3_b-ics-net",
+          "value": "192.168.95.2",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-fff053fbd3",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.6",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "NetworkSettings.Networks.grficsv3_b-ics-net",
+          "value": "192.168.95.200",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "NetworkSettings.Networks.grficsv3_c-dmz-net",
+          "value": "192.168.90.200",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-S001-87a0fb071c",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: FWUI_SECRET_KEY",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "secrets-hygiene",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "Config.Env",
+          "value": "FWUI_SECRET_KEY=<redacted>",
+          "note": "value not collected"
+        }
+      ],
+      "explanation": "Secrets passed as environment variables are visible to anyone who can inspect the container (docker inspect, /proc/<pid>/environ) and often leak into logs and crash dumps. Values were redacted and not analysed; the name alone indicates a likely credential.",
+      "remediation": "Use Docker secrets / mounted secret files with restricted permissions, and rotate any credential that was exposed via the environment.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N002-8e11f9cb59",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "network-segmentation",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "NetworkSettings.Networks.grficsv3_a-grfics-admin",
+          "value": "172.18.0.4",
+          "note": ""
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "NetworkSettings.Networks.grficsv3_b-ics-net",
+          "value": "192.168.95.45",
+          "note": ""
+        }
+      ],
+      "explanation": "A container attached to several networks is a potential bridge between segmentation zones (e.g. DMZ <-> process network). If it is compromised, an attacker can pivot across zones that the network design intends to keep apart. Whether this is intended (a router/firewall) needs human review.",
+      "remediation": "Attach the container only to the networks it must serve. Route inter-zone traffic through a dedicated, hardened firewall container and keep management networks separate from ICS process networks.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-cc312f426a",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-686c0fdf88",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-43f484d9a9",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:6080 -> 6080/tcp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-a2b8b31f01",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-5530a164e2",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-7d97762995",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-6726443bcf",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:6081 -> 8080/tcp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-a343b03efb",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-c6e5ed8856",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-ee0d4d1391",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-9597c1b196",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:8888 -> 8888/tcp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-8246b9b5d1",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-8c6d0e8428",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-attacker:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-attacker:latest",
+      "resource_id": "sha256:6cd239bfad704904054275db07f486d1531e4e61781a7bff3603af428e9b3d8b",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-attacker:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-attacker:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-attacker:latest",
+          "path": "used_by",
+          "value": "kali",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-4caef92d21",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-caldera:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-caldera:latest",
+      "resource_id": "sha256:a7a3edc9ef1661a3d0fbb8ad4fa40540490bc5d50ace08ba363bc36f07c1d5e1",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-caldera:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-caldera:latest",
+          "path": "used_by",
+          "value": "caldera",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-bdb1b41685",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-plc:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "resource_id": "sha256:7397c8440578dd8e9ff01133445ed264f1166beb5f00fc72d476d738b9797987",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-plc:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-plc:latest",
+          "path": "used_by",
+          "value": "plc",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-88b5ab583a",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-router:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-router:latest",
+      "resource_id": "sha256:9b9a167e5c78c933a44af0f47f62f6071294aac435e9f8f472a94d33396a94f3",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-router:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-router:latest",
+          "path": "used_by",
+          "value": "router",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-bb96196ac9",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-scadalts:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-scadalts:latest",
+      "resource_id": "sha256:83f3f576e769cb6878ee1188ee8ae79708a1efb5260a4c22022ba0b3171b1bbe",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-scadalts:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-scadalts:latest",
+          "path": "used_by",
+          "value": "HMI",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-7eb90dfea9",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-simulation:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-simulation:latest",
+      "resource_id": "sha256:ed3517811da2c4a542bf28b5f19f939ade8aa4d7ab1ac2de63c16087b34dd756",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-simulation:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-simulation:latest",
+          "path": "used_by",
+          "value": "simulation",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-I001-21a668129f",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-workstation:latest",
+      "resource_type": "image",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "resource_id": "sha256:0e9f4e94459b37f0d790cd3c8f1cade609dd8f14fbfc1fa07105c1d9df62b5b4",
+      "category": "image-hygiene",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-workstation:latest",
+          "note": ""
+        },
+        {
+          "source": "docker_image_inspect",
+          "resource": "fortiphyd/grfics-workstation:latest",
+          "path": "used_by",
+          "value": "EWS",
+          "note": ""
+        }
+      ],
+      "explanation": "`latest`/untagged images change silently when rebuilt or re-pulled, so the deployed software (and its vulnerabilities) is not reproducible or auditable.",
+      "remediation": "Pin images to an explicit version tag and, ideally, an immutable digest (`image: repo/name:1.2.3@sha256:...`).",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-3fdea5a984",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-f0697f802e",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-f0794d34af",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:6088 -> 6080/tcp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-4eb797ec63",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-b4244521ae",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-6e50cf6b1b",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-d97a4f8c87",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:8080 -> 8080/tcp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-a972f47047",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-5b03095036",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-94bb11ca8e",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-bcdd21cb20",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:51820 -> 51820/udp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-09ec4a69c5",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C006-5c0796e3b7",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "security-profile",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.SecurityOpt",
+          "value": "[]",
+          "note": ""
+        }
+      ],
+      "explanation": "Without no-new-privileges, setuid/setgid binaries inside the container can raise a process's privileges.",
+      "remediation": "Add `security_opt: [\"no-new-privileges:true\"]`.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C007-30bd0cb15c",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "filesystem",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.ReadonlyRootfs",
+          "value": "False",
+          "note": ""
+        }
+      ],
+      "explanation": "A writable root filesystem lets an attacker persist tools or modify binaries/configuration (e.g. PLC logic or HMI screens) inside the container.",
+      "remediation": "Set `read_only: true` and mount `tmpfs` / named volumes only for the paths that must be writable.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N001-97c8980cd6",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "network-exposure",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.PortBindings",
+          "value": "0.0.0.0:80 -> 80/tcp",
+          "note": ""
+        }
+      ],
+      "explanation": "These ports are reachable from every network the Docker host is attached to. This is an EXPOSURE observation, not a vulnerability by itself: risk depends on the service behind the port (see image vulnerabilities and authentication). ICS management interfaces (HMI, PLC web UI, engineering tools) should not be reachable from untrusted networks.",
+      "remediation": "Bind to loopback or a management interface (`127.0.0.1:8080:8080`) or remove the port mapping and reach the service via an internal network / jump host.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R001-2d99a39101",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "resources",
+      "severity": "low",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.NanoCpus",
+          "value": "0",
+          "note": "0 = unlimited"
+        },
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.PidsLimit",
+          "value": "None",
+          "note": "null/0/-1 = unlimited"
+        }
+      ],
+      "explanation": "Without limits, one runaway or compromised container can exhaust host memory/CPU/PIDs and starve every other ICS component (availability is the top priority in OT environments).",
+      "remediation": "Set `mem_limit`, `cpus` and `pids_limit` (compose) or `deploy.resources.limits` appropriate to each service.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-59d33f6786",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-a2d45cde25",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-a1957449c3",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "caldera",
+      "resource_id": "132c016b27d79b582fdbe74367262271f11485740f085b695d5c99f983ea8156",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-47cccf2f8c",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-86d0bd0af1",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-fee0f76e97",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "router",
+      "resource_id": "564a46aa48531142721d658d7eff33795e3a9311567dc514d878a92177235f63",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "router",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-C010-dea410a966",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "privilege",
+      "severity": "low",
+      "confidence": "medium",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.CapDrop",
+          "value": "null",
+          "note": ""
+        }
+      ],
+      "explanation": "The container keeps Docker's full default capability set (incl. NET_RAW, CHOWN, SETUID...). Most services need none of these.",
+      "remediation": "Add `cap_drop: [ALL]` and re-add only required capabilities.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R002-5288503991",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_type": "container",
+      "resource_name": "EWS",
+      "resource_id": "5a4c041a2851ce41063a5ab6436332b55ba93467f593b6c2b1fcd33a8bc91116",
+      "category": "resources",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.RestartPolicy.Name",
+          "value": "no",
+          "note": ""
+        }
+      ],
+      "explanation": "The container will not be restarted automatically after a crash or host reboot, which may affect availability of the simulated process.",
+      "remediation": "Use `restart: unless-stopped` for services that must stay available.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R002-6a49906a89",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_type": "container",
+      "resource_name": "HMI",
+      "resource_id": "fbb5ca710786e7f4136093a4fc041b8fa92e53179130b35aeb9221a1d74dc7b9",
+      "category": "resources",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.RestartPolicy.Name",
+          "value": "no",
+          "note": ""
+        }
+      ],
+      "explanation": "The container will not be restarted automatically after a crash or host reboot, which may affect availability of the simulated process.",
+      "remediation": "Use `restart: unless-stopped` for services that must stay available.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N005-39eae3dfcd",
+      "rule_id": "N005",
+      "title": "Network 'docker-audit-agent_default' is not internal (has external egress)",
+      "resource_type": "network",
+      "resource_name": "docker-audit-agent_default",
+      "resource_id": "2a14e19427d80836aa9cccb9a69712957ea0c115da4a5b5572211ca5a62f5df4",
+      "category": "network-segmentation",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_network",
+          "resource": "docker-audit-agent_default",
+          "path": "Internal",
+          "value": "False",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "docker-audit-agent_default",
+          "path": "Driver",
+          "value": "bridge",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "docker-audit-agent_default",
+          "path": "Containers",
+          "value": "none",
+          "note": ""
+        }
+      ],
+      "explanation": "Containers on this network can open outbound connections through the host. ICS process networks normally should not reach the internet.",
+      "remediation": "For process/control networks set `internal: true` and provide any required external access through an explicit, monitored gateway.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N005-bb9759638d",
+      "rule_id": "N005",
+      "title": "Network 'docker-audit-proxy_default' is not internal (has external egress)",
+      "resource_type": "network",
+      "resource_name": "docker-audit-proxy_default",
+      "resource_id": "f95c5a6c5f81f805f094005ff23e71363e2803b710af1af31826d0703d299250",
+      "category": "network-segmentation",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_network",
+          "resource": "docker-audit-proxy_default",
+          "path": "Internal",
+          "value": "False",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "docker-audit-proxy_default",
+          "path": "Driver",
+          "value": "bridge",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "docker-audit-proxy_default",
+          "path": "Containers",
+          "value": "docker-audit-socket-proxy",
+          "note": ""
+        }
+      ],
+      "explanation": "Containers on this network can open outbound connections through the host. ICS process networks normally should not reach the internet.",
+      "remediation": "For process/control networks set `internal: true` and provide any required external access through an explicit, monitored gateway.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N005-521c538eca",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_a-grfics-admin' is not internal (has external egress)",
+      "resource_type": "network",
+      "resource_name": "grficsv3_a-grfics-admin",
+      "resource_id": "8c666f0a31d9230270df685f6aaa75215a15dc702e71bb75d196ea4278512eec",
+      "category": "network-segmentation",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_a-grfics-admin",
+          "path": "Internal",
+          "value": "False",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_a-grfics-admin",
+          "path": "Driver",
+          "value": "bridge",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_a-grfics-admin",
+          "path": "Containers",
+          "value": "EWS, HMI, caldera, kali, plc, router, simulation",
+          "note": ""
+        }
+      ],
+      "explanation": "Containers on this network can open outbound connections through the host. ICS process networks normally should not reach the internet.",
+      "remediation": "For process/control networks set `internal: true` and provide any required external access through an explicit, monitored gateway.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N005-afbb443d90",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_b-ics-net' is not internal (has external egress)",
+      "resource_type": "network",
+      "resource_name": "grficsv3_b-ics-net",
+      "resource_id": "f33e47993c278d87f2df0b14eabdcc94d75bbca5bfe33708a8ee430a1fd785ee",
+      "category": "network-segmentation",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_b-ics-net",
+          "path": "Internal",
+          "value": "False",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_b-ics-net",
+          "path": "Driver",
+          "value": "bridge",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_b-ics-net",
+          "path": "Containers",
+          "value": "EWS, plc, router, simulation",
+          "note": ""
+        }
+      ],
+      "explanation": "Containers on this network can open outbound connections through the host. ICS process networks normally should not reach the internet.",
+      "remediation": "For process/control networks set `internal: true` and provide any required external access through an explicit, monitored gateway.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-N005-9b287ac708",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_c-dmz-net' is not internal (has external egress)",
+      "resource_type": "network",
+      "resource_name": "grficsv3_c-dmz-net",
+      "resource_id": "dad356c2fb85b644374586912e3624fa419759a1ab071bbb059f49feef6d8af3",
+      "category": "network-segmentation",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_c-dmz-net",
+          "path": "Internal",
+          "value": "False",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_c-dmz-net",
+          "path": "Driver",
+          "value": "bridge",
+          "note": ""
+        },
+        {
+          "source": "docker_network",
+          "resource": "grficsv3_c-dmz-net",
+          "path": "Containers",
+          "value": "HMI, caldera, kali, router",
+          "note": ""
+        }
+      ],
+      "explanation": "Containers on this network can open outbound connections through the host. ICS process networks normally should not reach the internet.",
+      "remediation": "For process/control networks set `internal: true` and provide any required external access through an explicit, monitored gateway.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R002-3387678041",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_type": "container",
+      "resource_name": "kali",
+      "resource_id": "5cb8741e3a179986088690e8adc4859517661f19084fa4a3f438ca0358ed0613",
+      "category": "resources",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "kali",
+          "path": "HostConfig.RestartPolicy.Name",
+          "value": "no",
+          "note": ""
+        }
+      ],
+      "explanation": "The container will not be restarted automatically after a crash or host reboot, which may affect availability of the simulated process.",
+      "remediation": "Use `restart: unless-stopped` for services that must stay available.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R002-f804afbc82",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_type": "container",
+      "resource_name": "plc",
+      "resource_id": "3aad92b036d1805e3d2c0b82e186486cffa44b5337ba53ae36bfefebc21e3b75",
+      "category": "resources",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "plc",
+          "path": "HostConfig.RestartPolicy.Name",
+          "value": "no",
+          "note": ""
+        }
+      ],
+      "explanation": "The container will not be restarted automatically after a crash or host reboot, which may affect availability of the simulated process.",
+      "remediation": "Use `restart: unless-stopped` for services that must stay available.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-R002-412014737c",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_type": "container",
+      "resource_name": "simulation",
+      "resource_id": "e2b3e2caf825f3133ce2a614fe49c1d8552e9181131939df28ac0cdbcdc01515",
+      "category": "resources",
+      "severity": "info",
+      "confidence": "high",
+      "status": "confirmed",
+      "source": "rule",
+      "evidence": [
+        {
+          "source": "docker_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.RestartPolicy.Name",
+          "value": "no",
+          "note": ""
+        }
+      ],
+      "explanation": "The container will not be restarted automatically after a crash or host reboot, which may affect availability of the simulated process.",
+      "remediation": "Use `restart: unless-stopped` for services that must stay available.",
+      "references": [],
+      "validation_notes": []
+    }
+  ],
+  "vulnerabilities": [
+    {
+      "image": "fortiphyd/grfics-workstation:latest",
+      "image_id": "sha256:0e9f4e94459b37f0d790cd3c8f1cade609dd8f14fbfc1fa07105c1d9df62b5b4",
+      "digest": "fortiphyd/grfics-workstation@sha256:0e9f4e94459b37f0d790cd3c8f1cade609dd8f14fbfc1fa07105c1d9df62b5b4",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 36,
+        "HIGH": 704,
+        "MEDIUM": 2175,
+        "LOW": 1218,
+        "UNKNOWN": 8
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2023-49569",
+          "package": "github.com/go-git/go-git/v5",
+          "installed_version": "v5.4.2",
+          "fixed_version": "5.11.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2023-49569",
+          "package": "github.com/go-git/go-git/v5",
+          "installed_version": "v5.4.2",
+          "fixed_version": "5.11.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2023-49569",
+          "package": "github.com/go-git/go-git/v5",
+          "installed_version": "v5.4.2",
+          "fixed_version": "5.11.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2023-49569",
+          "package": "github.com/go-git/go-git/v5",
+          "installed_version": "v5.4.2",
+          "fixed_version": "5.11.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2024-24790",
+          "package": "stdlib",
+          "installed_version": "v1.21.6",
+          "fixed_version": "1.21.11, 1.22.4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2024-24790",
+          "package": "stdlib",
+          "installed_version": "v1.21.6",
+          "fixed_version": "1.21.11, 1.22.4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2024-24790",
+          "package": "stdlib",
+          "installed_version": "v1.21.6",
+          "fixed_version": "1.21.11, 1.22.4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2024-24790",
+          "package": "stdlib",
+          "installed_version": "v1.21.6",
+          "fixed_version": "1.21.11, 1.22.4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2025-21613",
+          "package": "github.com/go-git/go-git/v5",
+          "installed_version": "v5.4.2",
+          "fixed_version": "5.13.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2025-21613",
+          "package": "github.com/go-git/go-git/v5",
+          "installed_version": "v5.4.2",
+          "fixed_version": "5.13.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        }
+      ]
+    },
+    {
+      "image": "tecnativa/docker-socket-proxy:v0.5.0",
+      "image_id": "sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459",
+      "digest": "tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 0,
+        "HIGH": 6,
+        "MEDIUM": 10,
+        "LOW": 13,
+        "UNKNOWN": 0
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2026-103111",
+          "package": "pcre2",
+          "installed_version": "10.47-r1",
+          "fixed_version": "10.49-r0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-14456",
+          "package": "libcrypto3",
+          "installed_version": "3.5.7-r0",
+          "fixed_version": "3.5.8-r0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-14456",
+          "package": "libssl3",
+          "installed_version": "3.5.7-r0",
+          "fixed_version": "3.5.8-r0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-86145",
+          "package": "pcre2",
+          "installed_version": "10.47-r1",
+          "fixed_version": "10.48-r0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-89157",
+          "package": "pcre2",
+          "installed_version": "10.47-r1",
+          "fixed_version": "10.48-r0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-89161",
+          "package": "pcre2",
+          "installed_version": "10.47-r1",
+          "fixed_version": "10.48-r0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-18798",
+          "package": "libcrypto3",
+          "installed_version": "3.5.7-r0",
+          "fixed_version": "3.5.8-r0",
+          "has_fix": true,
+          "severity": "MEDIUM",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-18798",
+          "package": "libssl3",
+          "installed_version": "3.5.7-r0",
+          "fixed_version": "3.5.8-r0",
+          "has_fix": true,
+          "severity": "MEDIUM",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-63072",
+          "package": "libcrypto3",
+          "installed_version": "3.5.7-r0",
+          "fixed_version": "3.5.8-r0",
+          "has_fix": true,
+          "severity": "MEDIUM",
+          "artifact_type": "alpine"
+        },
+        {
+          "vuln_id": "CVE-2026-63072",
+          "package": "libssl3",
+          "installed_version": "3.5.7-r0",
+          "fixed_version": "3.5.8-r0",
+          "has_fix": true,
+          "severity": "MEDIUM",
+          "artifact_type": "alpine"
+        }
+      ]
+    },
+    {
+      "image": "fortiphyd/grfics-attacker:latest",
+      "image_id": "sha256:6cd239bfad704904054275db07f486d1531e4e61781a7bff3603af428e9b3d8b",
+      "digest": "fortiphyd/grfics-attacker@sha256:6cd239bfad704904054275db07f486d1531e4e61781a7bff3603af428e9b3d8b",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 0,
+        "HIGH": 0,
+        "MEDIUM": 0,
+        "LOW": 0,
+        "UNKNOWN": 0
+      },
+      "top_vulnerabilities": []
+    },
+    {
+      "image": "fortiphyd/grfics-plc:latest",
+      "image_id": "sha256:7397c8440578dd8e9ff01133445ed264f1166beb5f00fc72d476d738b9797987",
+      "digest": "fortiphyd/grfics-plc@sha256:7397c8440578dd8e9ff01133445ed264f1166beb5f00fc72d476d738b9797987",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 55,
+        "HIGH": 1544,
+        "MEDIUM": 6197,
+        "LOW": 2083,
+        "UNKNOWN": 121
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "python3.9-dev",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "libpython3.9-stdlib",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "python3.9-venv",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "libpython3.9-dev",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "python3.9-minimal",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "libpython3.9",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "python3.9",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2021-29921",
+          "package": "libpython3.9-minimal",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2022-36227",
+          "package": "libarchive13",
+          "installed_version": "3.4.3-2+deb11u1",
+          "fixed_version": "3.4.3-2+deb11u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2022-37454",
+          "package": "libpython3.9",
+          "installed_version": "3.9.2-1",
+          "fixed_version": "3.9.2-1+deb11u4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        }
+      ]
+    },
+    {
+      "image": "fortiphyd/grfics-scadalts:latest",
+      "image_id": "sha256:83f3f576e769cb6878ee1188ee8ae79708a1efb5260a4c22022ba0b3171b1bbe",
+      "digest": "fortiphyd/grfics-scadalts@sha256:83f3f576e769cb6878ee1188ee8ae79708a1efb5260a4c22022ba0b3171b1bbe",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 47,
+        "HIGH": 92,
+        "MEDIUM": 146,
+        "LOW": 55,
+        "UNKNOWN": 0
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2015-1832",
+          "package": "org.apache.derby:derby",
+          "installed_version": "10.6.1.0",
+          "fixed_version": "10.12.1.1",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2016-1000027",
+          "package": "org.springframework:spring-web",
+          "installed_version": "4.3.16.RELEASE",
+          "fixed_version": "6.0.0",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2016-1000031",
+          "package": "commons-fileupload:commons-fileupload",
+          "installed_version": "1.3.2",
+          "fixed_version": "1.3.3",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2017-15095",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.8.11, 2.9.4, 2.6.7.3, 2.7.9.2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2017-17485",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.9.4, 2.8.11, 2.7.9.2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2017-7525",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.6.7.1, 2.7.9.1, 2.8.9",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2018-11307",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.7.9.4, 2.8.11.2, 2.9.6",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2018-14718",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.9.7, 2.8.11.3, 2.7.9.5, 2.6.7.3",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2018-14719",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.9.7, 2.8.11.3, 2.7.9.5",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        },
+        {
+          "vuln_id": "CVE-2018-14720",
+          "package": "com.fasterxml.jackson.core:jackson-databind",
+          "installed_version": "2.8.2",
+          "fixed_version": "2.9.7, 2.8.11.3, 2.7.9.5",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "jar"
+        }
+      ]
+    },
+    {
+      "image": "fortiphyd/grfics-router:latest",
+      "image_id": "sha256:9b9a167e5c78c933a44af0f47f62f6071294aac435e9f8f472a94d33396a94f3",
+      "digest": "fortiphyd/grfics-router@sha256:9b9a167e5c78c933a44af0f47f62f6071294aac435e9f8f472a94d33396a94f3",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 5,
+        "HIGH": 190,
+        "MEDIUM": 354,
+        "LOW": 247,
+        "UNKNOWN": 2
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2026-13221",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-42496",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-8376",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2023-45853",
+          "package": "zlib1g",
+          "installed_version": "1:1.2.13.dfsg-1",
+          "fixed_version": "",
+          "has_fix": false,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2025-7458",
+          "package": "libsqlite3-0",
+          "installed_version": "3.40.1-2+deb12u2",
+          "fixed_version": "",
+          "has_fix": false,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-42497",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-48962",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-57432",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-57433",
+          "package": "perl-base",
+          "installed_version": "5.36.0-7+deb12u3",
+          "fixed_version": "5.36.0-7+deb12u4",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2023-2953",
+          "package": "libldap-2.5-0",
+          "installed_version": "2.5.13+dfsg-5",
+          "fixed_version": "",
+          "has_fix": false,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        }
+      ]
+    },
+    {
+      "image": "fortiphyd/grfics-caldera:latest",
+      "image_id": "sha256:a7a3edc9ef1661a3d0fbb8ad4fa40540490bc5d50ace08ba363bc36f07c1d5e1",
+      "digest": "fortiphyd/grfics-caldera@sha256:a7a3edc9ef1661a3d0fbb8ad4fa40540490bc5d50ace08ba363bc36f07c1d5e1",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 85,
+        "HIGH": 1319,
+        "MEDIUM": 2796,
+        "LOW": 1247,
+        "UNKNOWN": 187
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.16.3",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.15.9",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.15.9",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.13",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.15.9",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.14.2",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2022-23806",
+          "package": "stdlib",
+          "installed_version": "v1.13.5",
+          "fixed_version": "1.16.14, 1.17.7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2023-24538",
+          "package": "stdlib",
+          "installed_version": "v1.13",
+          "fixed_version": "1.19.8, 1.20.3",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2023-24538",
+          "package": "stdlib",
+          "installed_version": "v1.18.1",
+          "fixed_version": "1.19.8, 1.20.3",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        },
+        {
+          "vuln_id": "CVE-2023-24538",
+          "package": "stdlib",
+          "installed_version": "v1.15.9",
+          "fixed_version": "1.19.8, 1.20.3",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "gobinary"
+        }
+      ]
+    },
+    {
+      "image": "fortiphyd/grfics-simulation:latest",
+      "image_id": "sha256:ed3517811da2c4a542bf28b5f19f939ade8aa4d7ab1ac2de63c16087b34dd756",
+      "digest": "fortiphyd/grfics-simulation@sha256:ed3517811da2c4a542bf28b5f19f939ade8aa4d7ab1ac2de63c16087b34dd756",
+      "scanner_version": "v0.68.2",
+      "counts": {
+        "CRITICAL": 7,
+        "HIGH": 157,
+        "MEDIUM": 246,
+        "LOW": 278,
+        "UNKNOWN": 8
+      },
+      "top_vulnerabilities": [
+        {
+          "vuln_id": "CVE-2026-31789",
+          "package": "openssl",
+          "installed_version": "3.0.16-1~deb12u1",
+          "fixed_version": "3.0.19-1~deb12u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-31789",
+          "package": "libssl3",
+          "installed_version": "3.0.16-1~deb12u1",
+          "fixed_version": "3.0.19-1~deb12u2",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-33845",
+          "package": "libgnutls30",
+          "installed_version": "3.7.9-2+deb12u4",
+          "fixed_version": "3.7.9-2+deb12u7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-42010",
+          "package": "libgnutls30",
+          "installed_version": "3.7.9-2+deb12u4",
+          "fixed_version": "3.7.9-2+deb12u7",
+          "has_fix": true,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2023-45853",
+          "package": "zlib1g",
+          "installed_version": "1:1.2.13.dfsg-1",
+          "fixed_version": "",
+          "has_fix": false,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2025-7458",
+          "package": "libsqlite3-0",
+          "installed_version": "3.40.1-2+deb12u1",
+          "fixed_version": "",
+          "has_fix": false,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2026-6653",
+          "package": "libxml2",
+          "installed_version": "2.9.14+dfsg-1.3~deb12u6",
+          "fixed_version": "",
+          "has_fix": false,
+          "severity": "CRITICAL",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2024-6345",
+          "package": "setuptools",
+          "installed_version": "65.5.1",
+          "fixed_version": "70.0.0",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "python-pkg"
+        },
+        {
+          "vuln_id": "CVE-2025-15467",
+          "package": "libssl3",
+          "installed_version": "3.0.16-1~deb12u1",
+          "fixed_version": "3.0.18-1~deb12u2",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        },
+        {
+          "vuln_id": "CVE-2025-15467",
+          "package": "openssl",
+          "installed_version": "3.0.16-1~deb12u1",
+          "fixed_version": "3.0.18-1~deb12u2",
+          "has_fix": true,
+          "severity": "HIGH",
+          "artifact_type": "debian"
+        }
+      ]
+    }
+  ],
+  "prioritized": [
+    {
+      "rank": 1,
+      "finding_id": "F-C008-8156eaec96",
+      "title": "Docker socket is mounted into the container",
+      "resource_name": "simulation",
+      "severity": "critical"
+    },
+    {
+      "rank": 2,
+      "finding_id": "F-V001-ec328b84bb",
+      "title": "Image has known vulnerabilities (85 CRITICAL, 1319 HIGH, 2796 MEDIUM, 1247 LOW, 187 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-caldera:latest",
+      "severity": "critical"
+    },
+    {
+      "rank": 3,
+      "finding_id": "F-V001-5c7f29bdf3",
+      "title": "Image has known vulnerabilities (55 CRITICAL, 1544 HIGH, 6197 MEDIUM, 2083 LOW, 121 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "severity": "critical"
+    },
+    {
+      "rank": 4,
+      "finding_id": "F-V001-c66c18dcb1",
+      "title": "Image has known vulnerabilities (5 CRITICAL, 190 HIGH, 354 MEDIUM, 247 LOW, 2 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-router:latest",
+      "severity": "critical"
+    },
+    {
+      "rank": 5,
+      "finding_id": "F-V001-885cc6c80e",
+      "title": "Image has known vulnerabilities (47 CRITICAL, 92 HIGH, 146 MEDIUM, 55 LOW)",
+      "resource_name": "fortiphyd/grfics-scadalts:latest",
+      "severity": "critical"
+    },
+    {
+      "rank": 6,
+      "finding_id": "F-V001-e3f7e95629",
+      "title": "Image has known vulnerabilities (7 CRITICAL, 157 HIGH, 246 MEDIUM, 278 LOW, 8 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-simulation:latest",
+      "severity": "critical"
+    },
+    {
+      "rank": 7,
+      "finding_id": "F-V001-9e8f54fed8",
+      "title": "Image has known vulnerabilities (36 CRITICAL, 704 HIGH, 2175 MEDIUM, 1218 LOW, 8 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "severity": "critical"
+    },
+    {
+      "rank": 8,
+      "finding_id": "F-V001-2b857d3575",
+      "title": "Image has known vulnerabilities (6 HIGH, 10 MEDIUM, 13 LOW)",
+      "resource_name": "tecnativa/docker-socket-proxy:v0.5.0",
+      "severity": "high"
+    },
+    {
+      "rank": 9,
+      "finding_id": "F-C002-383abc283c",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "rank": 10,
+      "finding_id": "F-C003-255ad39f7d",
+      "title": "Container runs as root",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "rank": 11,
+      "finding_id": "F-C002-3bf07d0e81",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "rank": 12,
+      "finding_id": "F-C003-9b67810909",
+      "title": "Container runs as root",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "rank": 13,
+      "finding_id": "F-C003-91987dbd22",
+      "title": "Container runs as root",
+      "resource_name": "caldera",
+      "severity": "medium"
+    },
+    {
+      "rank": 14,
+      "finding_id": "F-C002-11ce7daa2d",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "rank": 15,
+      "finding_id": "F-C003-205593608c",
+      "title": "Container runs as root",
+      "resource_name": "kali",
+      "severity": "medium"
+    }
+  ],
+  "recommendations": [
+    "Docker socket is mounted into the container: Remove the socket mount. If the service needs Docker metadata (e.g. a version/status page), give it a filtered read-only proxy such as tecnativa/docker-socket-proxy with POST=0 and only the needed API sections.",
+    "Image has known vulnerabilities (85 CRITICAL, 1319 HIGH, 2796 MEDIUM, 1247 LOW, 187 UNKNOWN): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+    "Image has known vulnerabilities (55 CRITICAL, 1544 HIGH, 6197 MEDIUM, 2083 LOW, 121 UNKNOWN): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+    "Image has known vulnerabilities (5 CRITICAL, 190 HIGH, 354 MEDIUM, 247 LOW, 2 UNKNOWN): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+    "Image has known vulnerabilities (47 CRITICAL, 92 HIGH, 146 MEDIUM, 55 LOW): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+    "Image has known vulnerabilities (7 CRITICAL, 157 HIGH, 246 MEDIUM, 278 LOW, 8 UNKNOWN): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+    "Image has known vulnerabilities (36 CRITICAL, 704 HIGH, 2175 MEDIUM, 1218 LOW, 8 UNKNOWN): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published.",
+    "Image has known vulnerabilities (6 HIGH, 10 MEDIUM, 13 LOW): Rebuild the image on an updated base image and upgrade the listed packages to their fixed versions; prioritise CRITICAL/HIGH findings in images whose ports are published."
+  ],
+  "limitations": [
+    "Metadata-only assessment: no runtime behaviour, network traffic or in-container files were inspected, and no active scanning was performed.",
+    "Image vulnerabilities come from Trivy's database at scan time; exploitability depends on whether the vulnerable code is reachable, which was not tested.",
+    "Secret values were redacted before analysis; credential findings are based on variable names and patterns only.",
+    "Findings reflect the Docker state at the snapshot time only; historical runs are not evidence of current state.",
+    "Trivy reported zero vulnerabilities for: fortiphyd/grfics-attacker:latest. This can mean the image is clean OR that Trivy does not support the image's OS/package manager (e.g. Kali Linux); treat these as 'not assessed' until verified."
+  ],
+  "errors": [],
+  "metrics": {
+    "started_at": "2026-10-26T19:39:26.377919Z",
+    "finished_at": "2026-10-26T19:42:58.438744Z",
+    "duration_seconds": 212.06,
+    "collection_seconds": 0.99,
+    "scan_seconds": 28.57,
+    "agent_seconds": 181.14,
+    "tool_calls_total": 460,
+    "tool_calls_agent": 7,
+    "tool_calls_blocked": 1,
+    "tool_calls_by_name": {
+      "docker.system_version": 1,
+      "docker.container_list": 3,
+      "docker.image_list": 2,
+      "docker.network_list": 1,
+      "docker.volume_list": 1,
+      "trivy.trivy_version": 1,
+      "trivy.scan_image": 10,
+      "trivy.findings_list": 440,
+      "docker.container_inspect": 1
+    },
+    "redactions": 421,
+    "model_requests": 8,
+    "input_tokens": 82952,
+    "output_tokens": 5641,
+    "total_tokens": 88593
+  }
+}

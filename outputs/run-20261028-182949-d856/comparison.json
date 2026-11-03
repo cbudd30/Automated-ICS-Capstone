@@ -1,0 +1,674 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261028-182949-d856",
+  "generated_at": "2026-10-28T18:42:51.562118Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.2,
+      "max_tokens": null,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "agent_status": "error",
+  "snapshot_id": "snap-9b3a3ad7a5fe1631",
+  "scores": {
+    "deterministic_total": 85,
+    "found": 0,
+    "missed": 85,
+    "recall": 0.0,
+    "weighted_recall": 0.0,
+    "by_severity": [
+      {
+        "severity": "critical",
+        "total": 7,
+        "found": 0
+      },
+      {
+        "severity": "high",
+        "total": 1,
+        "found": 0
+      },
+      {
+        "severity": "medium",
+        "total": 25,
+        "found": 0
+      },
+      {
+        "severity": "low",
+        "total": 42,
+        "found": 0
+      },
+      {
+        "severity": "info",
+        "total": 10,
+        "found": 0
+      }
+    ],
+    "agent_total": 0,
+    "agent_matched": 0,
+    "agent_unmatched": 0,
+    "agent_rejected": 0,
+    "match_rate": 0.0,
+    "rejection_rate": 0.0
+  },
+  "found": [],
+  "missed": [
+    {
+      "finding_id": "F-V001-ec328b84bb",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (85 CRITICAL, 1319 HIGH, 2796 MEDIUM, 1247 LOW, 187 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-caldera:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-5c7f29bdf3",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (55 CRITICAL, 1544 HIGH, 6197 MEDIUM, 2083 LOW, 121 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-c66c18dcb1",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (5 CRITICAL, 190 HIGH, 354 MEDIUM, 247 LOW, 2 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-router:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-885cc6c80e",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (47 CRITICAL, 92 HIGH, 146 MEDIUM, 55 LOW)",
+      "resource_name": "fortiphyd/grfics-scadalts:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-e3f7e95629",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (7 CRITICAL, 157 HIGH, 246 MEDIUM, 278 LOW, 8 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-simulation:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-9e8f54fed8",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (36 CRITICAL, 704 HIGH, 2175 MEDIUM, 1218 LOW, 8 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-C008-e28fcee7e7",
+      "rule_id": "C008",
+      "title": "Docker socket is mounted into the container",
+      "resource_name": "simulation",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-2b857d3575",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (6 HIGH, 10 MEDIUM, 13 LOW)",
+      "resource_name": "tecnativa/docker-socket-proxy:v0.5.0",
+      "severity": "high"
+    },
+    {
+      "finding_id": "F-C002-3f72b98b24",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-1148fac8d8",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C002-5ccf4fae24",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-b07c36fac1",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-294b529fdc",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "caldera",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C002-ef2a81682f",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-cf7897f0d8",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C002-116d497111",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "plc",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-18e91b1739",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "plc",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C002-233bf393d6",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN, NET_RAW",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-c5d93ea4b0",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N003-3eb43354fa",
+      "rule_id": "N003",
+      "title": "IP forwarding enabled inside the container",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C002-7d433bbe88",
+      "rule_id": "C002",
+      "title": "Container adds dangerous capabilities: NET_ADMIN",
+      "resource_name": "simulation",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C003-9b3333ad46",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "simulation",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-ee2ff4d33d",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-f5b386fa18",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: VNC_PASSWORD",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-a9ba10ffdb",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-aa9473743c",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, TOMCAT_PASSWORD",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-25651cb7e6",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "caldera",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-bda984b6ef",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-6309982903",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: VNC_PASSWORD",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-ddb43c5903",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "plc",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-968507efd3",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-aab7f638e3",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: FWUI_SECRET_KEY",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-a76c282ed4",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "simulation",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C006-b51b12aafa",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-792c68f60e",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-91ac9caedc",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-fed16234d6",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-3ac4d642ae",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-dbcf4ca4fb",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-3439d18210",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-facac27728",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-eb67045425",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-b6acb8ae18",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-c41076fb49",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-d03d448e5a",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-8c6d0e8428",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-attacker:latest",
+      "resource_name": "fortiphyd/grfics-attacker:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-4caef92d21",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-caldera:latest",
+      "resource_name": "fortiphyd/grfics-caldera:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-bdb1b41685",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-plc:latest",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-88b5ab583a",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-router:latest",
+      "resource_name": "fortiphyd/grfics-router:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-bb96196ac9",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-scadalts:latest",
+      "resource_name": "fortiphyd/grfics-scadalts:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-7eb90dfea9",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-simulation:latest",
+      "resource_name": "fortiphyd/grfics-simulation:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-21a668129f",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-workstation:latest",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-28a557d52a",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-7b14c3541f",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-82672a6fee",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-60046a084b",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-c84c236e66",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-bfa67fd6c7",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-b21d50835d",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-49f443bf24",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-4823ff4941",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-186349a0ff",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-b0b7bc8299",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-844f7788b7",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-33603630ab",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-6c485d3443",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-a66bafe8d0",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R001-1c0aa23ac1",
+      "rule_id": "R001",
+      "title": "Missing resource limits: memory, cpu, pids",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-181706a20e",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-d7c75b6449",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-22e8d6518d",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-716b899fd4",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-6b77bc20c7",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-eac6857fd0",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-5cf6d7c8ee",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R002-c0689fffd3",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "EWS",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-fccc88f7c1",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "HMI",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-39eae3dfcd",
+      "rule_id": "N005",
+      "title": "Network 'docker-audit-agent_default' is not internal (has external egress)",
+      "resource_name": "docker-audit-agent_default",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-bb9759638d",
+      "rule_id": "N005",
+      "title": "Network 'docker-audit-proxy_default' is not internal (has external egress)",
+      "resource_name": "docker-audit-proxy_default",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-86ba7de000",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_a-grfics-admin' is not internal (has external egress)",
+      "resource_name": "grficsv3_a-grfics-admin",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-07e0405563",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_b-ics-net' is not internal (has external egress)",
+      "resource_name": "grficsv3_b-ics-net",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-290cff6b58",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_c-dmz-net' is not internal (has external egress)",
+      "resource_name": "grficsv3_c-dmz-net",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-e196c3a9d4",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "kali",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-3ec0d3a8b9",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "plc",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-b86343f8bb",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "simulation",
+      "severity": "info"
+    }
+  ],
+  "agent_unmatched": [],
+  "agent_rejected": [],
+  "agent_out_of_scope": [],
+  "method": [
+    "The agent never saw the deterministic findings; they are used here as the answer key.",
+    "An agent finding covers a deterministic finding when it names the same resource (for image findings, also a container running that image) and cites the same Docker field as the rule's evidence (prefix match, list indexes ignored, equivalent fields accepted).",
+    "Image vulnerabilities (V001) are scored per image: covered when the agent reported at least one vulnerability ID that Trivy found in that image.",
+    "Where two rules use the same field, the agent's wording decides (e.g. 'docker.sock' -> socket mount C008, otherwise sensitive bind mount C009).",
+    "Only validated agent findings can cover a deterministic finding; rejected ones never do.",
+    "Weighted recall weights findings by severity: critical 4, high 3, medium 2, low 1, info 0."
+  ]
+}

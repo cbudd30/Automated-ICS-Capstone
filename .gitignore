@@ -11,11 +11,12 @@ dist/
 # Secrets
 .env
 
-# Generated data (SQLite DBs, reports)
+# Generated data (SQLite DBs, agent conversations, range baselines)
 data/*
 !data/.gitkeep
-outputs/*
-!outputs/.gitkeep
+
+# Run reports in outputs/ are committed so the team can review them.
+# They are redacted (credential values show as <redacted>).
 
 # OS / editors
 .DS_Store

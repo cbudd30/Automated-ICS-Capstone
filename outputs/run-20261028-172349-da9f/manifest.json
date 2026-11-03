@@ -1,0 +1,261 @@
+{
+  "config_sha256": "1fb9fbe150426b2ee9f07ee68cf055d7a8331fbf952a836a05b302ed82e00f08",
+  "manifest": {
+    "acquisition": {
+      "argument_policy": {
+        "scan_image": {
+          "allowed_scan_types": [
+            "vuln"
+          ],
+          "forced_output_format": "json",
+          "restrict_targets_to_inventory": true
+        }
+      },
+      "docker_endpoint": {
+        "docker_host": "tcp://127.0.0.1:2375",
+        "docker_version": "29.7.2",
+        "proxy_verified": true,
+        "require_proxy": true
+      },
+      "mcp_servers": [
+        {
+          "allowed_tools": [
+            "container_list",
+            "container_inspect",
+            "image_list",
+            "image_inspect",
+            "image_history",
+            "network_list",
+            "network_inspect",
+            "volume_list",
+            "volume_inspect",
+            "system_info",
+            "system_version"
+          ],
+          "args": [
+            "docker-mcp-server==2.2.7"
+          ],
+          "command": "uvx",
+          "env_names": [
+            "DOCKER_MCP_SERVER_READONLY"
+          ],
+          "name": "docker",
+          "role": "docker_inspection"
+        },
+        {
+          "allowed_tools": [
+            "scan_image",
+            "findings_list",
+            "findings_get",
+            "trivy_version"
+          ],
+          "args": [
+            "mcp",
+            "--transport",
+            "stdio"
+          ],
+          "command": "trivy",
+          "env_names": [],
+          "name": "trivy",
+          "role": "image_scanner"
+        }
+      ],
+      "mode": "live",
+      "range_check": {
+        "last_reset_at": "2026-10-28T17:23:19Z",
+        "last_reset_matched": true,
+        "verified_at": "2026-10-28T17:23:50.829122Z"
+      },
+      "redaction": {
+        "env_value_allowlist": [
+          "PATH",
+          "LANG",
+          "LC_ALL",
+          "LANGUAGE",
+          "TZ",
+          "HOME",
+          "HOSTNAME",
+          "TERM",
+          "DEBIAN_FRONTEND",
+          "NODE_ENV",
+          "*_VERSION"
+        ],
+        "sensitive_key_exceptions": [
+          "next_token",
+          "token_type"
+        ],
+        "sensitive_key_patterns": [
+          "*password*",
+          "*passwd*",
+          "*secret*",
+          "*token*",
+          "*api_key*",
+          "*apikey*",
+          "*private_key*",
+          "*credential*",
+          "*authorization*",
+          "*auth_token*"
+        ]
+      },
+      "scan": {
+        "enabled": true,
+        "max_images": 0,
+        "page_size": 500,
+        "scope": "used",
+        "severities": [
+          "CRITICAL",
+          "HIGH",
+          "MEDIUM",
+          "LOW",
+          "UNKNOWN"
+        ]
+      }
+    },
+    "created_at": "2026-10-28T17:39:21.037717Z",
+    "experiment": {
+      "agent": {
+        "max_duration_seconds": 3600.0,
+        "max_tool_calls": 100,
+        "max_tool_result_chars": 12000,
+        "max_turns": 60,
+        "named_session": false
+      },
+      "evidence": {
+        "scan_ids": [
+          204,
+          205,
+          206,
+          207,
+          208,
+          209,
+          210,
+          211
+        ],
+        "snapshot_id": "snap-fb281edbac80d479"
+      },
+      "logging": {
+        "record_conversation": true,
+        "record_findings": true,
+        "record_tool_calls": true,
+        "tracing_enabled": false
+      },
+      "models": {
+        "assessment_agent": {
+          "api_key_env": "VLLM_API_KEY",
+          "base_url": "http://localhost:8000/v1",
+          "max_retries": 1,
+          "max_tokens": null,
+          "min_context_tokens": 16384,
+          "model": "Qwen/Qwen3-32B",
+          "name": "local-vllm",
+          "provider": "vllm",
+          "structured_output": "prompted",
+          "temperature": 0.2,
+          "timeout_seconds": 600.0
+        }
+      },
+      "objective": "Assess the security posture of the Docker environment hosting a containerized industrial control system (ICS) lab. Identify container misconfigurations, risky network exposure, missing resource limits, and known image vulnerabilities. Prioritise risks by their impact on an OT environment and give concrete, evidence-based remediation for defenders.",
+      "prompt_bundle": {
+        "instructions_sha256": "7c62b79cf3c3281cf6c27f8a687e5d2f9b7d0ea0993d3f79ecf42a162ba3dee8",
+        "version": "v5"
+      },
+      "range_baseline": {
+        "baseline_snapshot_id": "snap-128c413894057962",
+        "fingerprint_sha256": "ace1974091c56c991da0e2ccbf90410603bf9fd1d2940a21e52c853aa009e20b",
+        "name": "clean-v1"
+      },
+      "rules": {
+        "dangerous_capabilities": {
+          "ALL": "critical",
+          "AUDIT_CONTROL": "medium",
+          "BPF": "high",
+          "DAC_READ_SEARCH": "high",
+          "MKNOD": "low",
+          "NET_ADMIN": "medium",
+          "NET_RAW": "medium",
+          "PERFMON": "medium",
+          "SYS_ADMIN": "critical",
+          "SYS_MODULE": "critical",
+          "SYS_PTRACE": "high",
+          "SYS_RAWIO": "high",
+          "SYS_TIME": "medium"
+        },
+        "disabled_rules": [],
+        "docker_socket_paths": [
+          "/var/run/docker.sock",
+          "/run/docker.sock",
+          "/var/run/docker",
+          "/run/containerd/containerd.sock"
+        ],
+        "home_directory_roots": [
+          "/home",
+          "/Users"
+        ],
+        "ignore_containers": [
+          "docker-audit-socket-proxy",
+          "docker-audit-agent-*"
+        ],
+        "include_stopped_containers": true,
+        "secret_env_name_patterns": [
+          "*PASSWORD*",
+          "*PASSWD*",
+          "*SECRET*",
+          "*TOKEN*",
+          "*API_KEY*",
+          "*APIKEY*",
+          "*PRIVATE_KEY*",
+          "*CREDENTIAL*",
+          "*ACCESS_KEY*"
+        ],
+        "sensitive_home_subpaths": [
+          ".ssh",
+          ".docker",
+          ".aws",
+          ".azure",
+          ".kube",
+          ".gnupg",
+          ".config/gcloud",
+          "Library/Keychains"
+        ],
+        "sensitive_host_paths": [
+          "/",
+          "/etc",
+          "/proc",
+          "/sys",
+          "/dev",
+          "/boot",
+          "/root",
+          "/var/lib/docker",
+          "/var/log",
+          "/lib/modules",
+          "/usr",
+          "/run",
+          "/private/etc"
+        ],
+        "severity_overrides": {},
+        "vulnerability_min_severity": "low"
+      },
+      "sampling": {
+        "assessment_agent": {
+          "max_tokens": null,
+          "temperature": 0.2
+        }
+      },
+      "scenario_id": "grficsv3-baseline",
+      "schema_versions": {
+        "assessment_schema_sha256": "209ac6096f37735acd281644e565f70c36011f8b09d9356d4cd86197ecb63c31",
+        "db_schema_version": 4,
+        "report_version": "2.0"
+      }
+    },
+    "framework": {
+      "commit": "d8e21b2d0afd10ca933207dedaf160c4bf4ab450",
+      "dirty": true,
+      "package_version": "0.1.0"
+    },
+    "manifest_version": "2",
+    "replay_of": null,
+    "run_id": "run-20261028-172349-da9f"
+  },
+  "manifest_sha256": "a85875ab47f0ebdd9feafbef9b8eb411f9a22c6c9bd2c05ab20a3241fcbc7a78"
+}

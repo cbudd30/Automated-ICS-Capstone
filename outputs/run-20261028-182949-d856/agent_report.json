@@ -1,0 +1,64 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261028-182949-d856",
+  "generated_at": "2026-10-28T18:42:51.561516Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.2,
+      "max_tokens": null,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "prompt_version": "v5",
+  "agent_status": "error",
+  "snapshot_id": "snap-9b3a3ad7a5fe1631",
+  "executive_summary": "The agent produced no valid assessment (status: error). See errors below.",
+  "overall_risk": null,
+  "findings": [],
+  "rejected": [],
+  "out_of_scope": [],
+  "recommendations": [],
+  "limitations": [],
+  "validation_notes": [],
+  "errors": [
+    "agent: BadRequestError: Error code: 400 - {'error': {'message': \"This model's maximum context length is 131072 tokens. However, your prompt contains at least 131073 input tokens, which exceeds this limit even without any output tokens. Please reduce the length of the input prompt. (parameter=input_tokens, value=131073)\", 'type': 'BadRequestError', 'param': 'input_tokens', 'code': 400}}"
+  ],
+  "metrics": {
+    "started_at": "2026-10-28T18:29:49.733683Z",
+    "finished_at": "2026-10-28T18:42:51.552290Z",
+    "duration_seconds": 781.8,
+    "collection_seconds": 0.99,
+    "scan_seconds": 22.09,
+    "agent_seconds": 758.01,
+    "tool_calls_total": 489,
+    "tool_calls_agent": 36,
+    "tool_calls_blocked": 1,
+    "tool_calls_by_name": {
+      "docker.system_version": 1,
+      "docker.container_list": 2,
+      "docker.image_list": 2,
+      "docker.network_list": 1,
+      "docker.volume_list": 1,
+      "trivy.trivy_version": 1,
+      "trivy.scan_image": 16,
+      "trivy.findings_list": 458,
+      "docker.container_inspect": 7
+    },
+    "redactions": 444,
+    "model_requests": 0,
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261028-172349-da9f",
+  "generated_at": "2026-10-28T18:26:26.654422Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.2,
+      "max_tokens": null,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "prompt_version": "v5",
+  "agent_status": "error",
+  "snapshot_id": "snap-fb281edbac80d479",
+  "executive_summary": "The agent produced no valid assessment (status: error). See errors below.",
+  "overall_risk": null,
+  "findings": [],
+  "rejected": [],
+  "out_of_scope": [],
+  "recommendations": [],
+  "limitations": [],
+  "validation_notes": [],
+  "errors": [
+    "agent: APIConnectionError: Connection error."
+  ],
+  "metrics": {
+    "started_at": "2026-10-28T17:23:49.493932Z",
+    "finished_at": "2026-10-28T18:26:26.642971Z",
+    "duration_seconds": 157.53,
+    "collection_seconds": 0.95,
+    "scan_seconds": 29.42,
+    "agent_seconds": 126.54,
+    "tool_calls_total": 453,
+    "tool_calls_agent": 0,
+    "tool_calls_blocked": 0,
+    "tool_calls_by_name": {
+      "docker.system_version": 1,
+      "docker.container_list": 1,
+      "docker.image_list": 1,
+      "docker.network_list": 1,
+      "docker.volume_list": 1,
+      "trivy.trivy_version": 1,
+      "trivy.scan_image": 8,
+      "trivy.findings_list": 439
+    },
+    "redactions": 210,
+    "model_requests": 0,
+    "input_tokens": null,
+    "output_tokens": null,
+    "total_tokens": null
+  }
+}
