@@ -8,7 +8,7 @@ Tables
 ------
 runs          one row per assessment run: model, prompt version, MCP versions,
               objective, snapshot used, status, errors, metrics, the three
-              reports (deterministic, agent, comparison), and the run's
+              reports (deterministic, agent), and the run's
               immutable manifest + its hashes
 snapshots     inventory snapshots (content-addressed by snapshot_id); shared
               by every run that used the same evidence
@@ -16,12 +16,17 @@ scans         one row per image scan (linked to the snapshot it belongs to)
 vulnerabilities  every vulnerability Trivy reported for a scan
 findings      every finding of a run (rule, scanner and agent), with evidence
 tool_calls    audit trail of every MCP/function tool call in a run
+tool_outputs  (v5) the full result of every agent tool call, keyed by
+              the short reference the agent sees (E1, E2...); what
+              ``evidence_get`` reads back and the audit trail of what the
+              agent was shown
+agent_sections (v5) the per-container sections the agent wrote during a run
 
 Large/nested values (evidence lists, snapshot documents, metrics) are stored
 as JSON text; everything you would filter on has its own column.
 
-Nothing sensitive is stored: all tool results are redacted before they are
-parsed into the objects that end up here.
+Tool results are stored unredacted (harness h3): environment values, labels
+and any credentials in them end up here as-is. Treat the database as sensitive.
 """
 
 from __future__ import annotations
@@ -29,7 +34,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_info (
@@ -45,7 +50,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
     image_count     INTEGER,
     network_count   INTEGER,
     volume_count    INTEGER,
-    data_json       TEXT NOT NULL          -- full InventorySnapshot (redacted)
+    data_json       TEXT NOT NULL          -- full InventorySnapshot
 );
 
 CREATE TABLE IF NOT EXISTS runs (
@@ -53,9 +58,8 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at      TEXT NOT NULL,
     finished_at     TEXT,
     status          TEXT NOT NULL,         -- running / completed / completed_with_errors / failed
-    mode            TEXT NOT NULL,         -- live / replay / deterministic
-                                           -- (replay: deterministic re-run on stored
-                                           -- evidence; agent runs are always live)
+    mode            TEXT NOT NULL,         -- live / deterministic (older runs may say
+                                           -- "replay": a rules-only re-run, now removed)
     objective       TEXT NOT NULL,
     model_profile   TEXT,
     model_provider  TEXT,
@@ -63,8 +67,8 @@ CREATE TABLE IF NOT EXISTS runs (
     model_config_json TEXT,
     prompt_version  TEXT,
     mcp_servers_json TEXT,                 -- servers, versions, approved tools
-    docker_endpoint_json TEXT,             -- endpoint used + whether the read-only proxy
-                                           -- was required and verified (live runs only)
+    docker_endpoint_json TEXT,             -- Docker endpoint used (live runs only); older
+                                           -- runs also record the read-only proxy check
     manifest_sha256 TEXT,                  -- immutable run manifest (see manifest.py);
     config_sha256   TEXT,                  -- written once, never updated
     manifest_json   TEXT,
@@ -75,7 +79,7 @@ CREATE TABLE IF NOT EXISTS runs (
     metrics_json    TEXT,
     report_json     TEXT,                  -- deterministic Report (`docker-audit report`)
     agent_report_json TEXT,                -- AgentReport (agent runs only)
-    comparison_json TEXT                   -- Comparison: agent vs deterministic
+    comparison_json TEXT                   -- legacy: comparison removed, no longer written
 );
 
 CREATE TABLE IF NOT EXISTS scans (
@@ -130,12 +134,32 @@ CREATE TABLE IF NOT EXISTS tool_calls (
     phase           TEXT NOT NULL,         -- collector / agent
     server          TEXT,
     tool            TEXT,
-    arguments_json  TEXT,                  -- redacted
+    arguments_json  TEXT,
     status          TEXT,
     duration_ms     INTEGER,
     result_chars    INTEGER,
-    redactions      INTEGER,
     error           TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tool_outputs (
+    run_id          TEXT NOT NULL REFERENCES runs(run_id),
+    ref             TEXT NOT NULL,         -- E1, E2... as shown to the agent
+    seq             INTEGER NOT NULL,
+    created_at      TEXT NOT NULL,
+    server          TEXT NOT NULL,
+    tool            TEXT NOT NULL,
+    arguments_json  TEXT NOT NULL,
+    result_json     TEXT NOT NULL,         -- full result, not shaped
+    shaped_chars    INTEGER,               -- size of what the model was sent
+    PRIMARY KEY (run_id, ref)
+);
+
+CREATE TABLE IF NOT EXISTS agent_sections (
+    run_id          TEXT NOT NULL REFERENCES runs(run_id),
+    resource_name   TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
+    data_json       TEXT NOT NULL,         -- ContainerSection as written by the agent
+    PRIMARY KEY (run_id, resource_name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_scans_snapshot ON scans(snapshot_id);
@@ -171,6 +195,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "agent_report_json",  # v4
         "comparison_json",  # v4
     ]
+    # v5 only adds tables (tool_outputs, agent_sections): created by SCHEMA above.
     run_cols = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
     for col in added_run_columns:
         if col not in run_cols:

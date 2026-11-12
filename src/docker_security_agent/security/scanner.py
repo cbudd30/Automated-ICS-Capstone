@@ -5,9 +5,8 @@ for two reasons:
 
 * **Completeness** - every report contains vulnerability data for every
   in-scope image, regardless of how capable the model is.
-* **Reproducibility** - results are stored per snapshot, so a later run with a
-  different model can reuse exactly the same scanner evidence
-  (``assess --snapshot <id>``).
+* **Traceability** - results are stored per run and snapshot, so every
+  report's vulnerability data can be traced back to the scan that produced it.
 
 Flow per image:  scan_image -> batch_id -> findings_list (paginate) -> records.
 """

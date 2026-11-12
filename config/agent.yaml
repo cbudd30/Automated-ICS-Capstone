@@ -8,11 +8,14 @@ name: DockerSecurityAssessmentAgent
 # environment itself with MCP tools (it does not get the deterministic
 # findings), so it needs room to inspect every container and scan images.
 limits:
-  max_turns: 60               # SDK agent-loop turns (one model call per turn)
-  max_tool_calls: 100         # tool calls the agent may make in one run
-  max_duration_seconds: 3600  # wall-clock budget for the agent phase
-  max_tool_result_chars: 12000  # tool results longer than this are truncated
-                                # before they reach the model
+  max_turns: 150              # SDK agent-loop turns (one model call per turn)
+  max_tool_calls: 200         # tool calls the agent may make in one run
+  max_duration_seconds: 7200  # wall-clock budget for the agent phase
+  max_tool_result_chars: 12000  # tool results longer than this are cut at a line
+                                # boundary before they reach the model
+  keep_recent_tool_outputs: 8   # before each model call, the last 8 tool results stay
+                                # in full; older ones become a stub with their
+                                # reference (fetchable with evidence_get)
 
 # Conversation memory (OpenAI Agents SDK SQLiteSession). By default every
 # run gets a fresh session (session id = run id). Pass `--session NAME` to

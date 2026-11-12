@@ -19,7 +19,6 @@ services:
   agent:
     networks:
       default: {}
-      docker-audit-mgmt: {}
       grfics-dmz: {}
 
 networks:

@@ -1,8 +1,8 @@
 """Build the deterministic ``Report`` and write ``deterministic_report.json`` + ``.md``.
 
 Every run writes this report. It contains no LLM output at all: it is what the
-rules and the scanner found, and it is the answer key the agent's own report
-is compared against (see agent_report.py and comparison_report.py).
+rules and the scanner found, independently of the agent's own report
+(agent_report.py).
 
 ``build_report`` merges three sources into one validated ``Report`` object:
 
@@ -47,8 +47,6 @@ STANDARD_LIMITATIONS = [
     "were inspected, and no active scanning was performed.",
     "Image vulnerabilities come from Trivy's database at scan time; exploitability depends on "
     "whether the vulnerable code is reachable, which was not tested.",
-    "Secret values were redacted before analysis; credential findings are based on variable "
-    "names and patterns only.",
     "Findings reflect the Docker state at the snapshot time only; historical runs are not "
     "evidence of current state.",
 ]
@@ -296,21 +294,16 @@ def _finding_block(f: Finding) -> str:
         "",
         f"**Why it matters:** {f.explanation}",
         "",
-        f"**Remediation:** {f.remediation}",
-        "",
     ]
-    if f.validation_notes:
-        lines += [f"**Validation:** {'; '.join(f.validation_notes)}", ""]
+    if f.remediation:  # agent findings have none (prompt v9)
+        lines += [f"**Remediation:** {f.remediation}", ""]
     if f.references:
         lines += ["**References:** " + ", ".join(f.references), ""]
     return "\n".join(lines)
 
 
 def _endpoint_line(e: DockerEndpointInfo) -> str:
-    proxy = (
-        "read-only proxy verified" if e.proxy_verified else "**NOT verified as read-only proxy**"
-    )
-    return f"`{e.docker_host}` ({proxy}; require_proxy: {str(e.require_proxy).lower()})"
+    return f"`{e.docker_host}` (full Docker access)"
 
 
 def render_markdown(r: Report) -> str:
@@ -324,8 +317,7 @@ def render_markdown(r: Report) -> str:
     md.append(
         f"**Source:** rules + Trivy only, no AI · **Snapshot:** `{r.snapshot_id}`"
         + (
-            f" · **Agent model in this run:** `{r.model.profile}` (see agent_report.md and "
-            "comparison.md)"
+            f" · **Agent model in this run:** `{r.model.profile}` (see agent_report.md)"
             if r.model
             else ""
         )
@@ -336,8 +328,6 @@ def render_markdown(r: Report) -> str:
             f"**Manifest:** `manifest.json` · sha256 `{r.manifest_sha256}` · "
             f"config `{r.config_sha256}`\n"
         )
-    if r.docker_endpoint and r.docker_endpoint.unenforced_warning:
-        md.append(f"> [!CAUTION]\n> **{r.docker_endpoint.unenforced_warning}**\n")
 
     md.append("## 1. Assessment summary\n")
     md.append(f"{s.executive_summary}\n")
@@ -522,7 +512,6 @@ def metrics_markdown(m: RunMetrics, mcp_servers: list[MCPServerInfo]) -> str:
                     "Tool calls (total / by agent / blocked)",
                     f"{m.tool_calls_total} / {m.tool_calls_agent} / {m.tool_calls_blocked}",
                 ],
-                ["Values redacted", str(m.redactions)],
                 ["Model requests", str(m.model_requests)],
                 [
                     "Tokens (in / out / total)",

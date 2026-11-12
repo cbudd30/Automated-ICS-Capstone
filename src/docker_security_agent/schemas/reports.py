@@ -1,6 +1,6 @@
 """Report models.
 
-Four families live here:
+Three families live here:
 
 1. ``AgentAssessment`` - the structured output the LLM must return: its own
    findings, each backed by evidence it read with MCP tools. It is kept
@@ -10,14 +10,10 @@ Four families live here:
 
 2. ``Report`` - the deterministic report (``deterministic_report.json`` /
    ``.md``): inventory, rule findings, scanner results and run metrics. It is
-   the answer key the agent is compared against.
+   produced without any AI and is independent of the agent report.
 
 3. ``AgentReport`` - the agent report (``agent_report.json`` / ``.md``): only
-   what the agent found, after validation.
-
-4. ``Comparison`` - agent vs deterministic (``comparison.json`` / ``.md``):
-   which deterministic findings the agent found or missed, and what it
-   reported beyond them.
+   what the agent found, as it reported it (not checked against the data).
 """
 
 from __future__ import annotations
@@ -55,7 +51,22 @@ class AgentFinding(BaseModel):
         description="CVE/GHSA IDs copied from Trivy findings for this resource; [] otherwise"
     )
     explanation: str = Field(description="Why this matters in an OT/ICS context")
-    remediation: str
+
+
+class ContainerSection(BaseModel):
+    """One container's part of the assessment, written by the agent as it goes (h2).
+
+    Same finding schema as the final assessment: structured findings with
+    tool/field/value evidence, not a free-text summary. The harness merges the
+    sections' findings into ``AgentAssessment.findings`` before the report is built.
+    """
+
+    resource_name: str = Field(description="Exact name of the container this section covers")
+    findings: list[AgentFinding] = Field(description="Every issue found on this container")
+    evidence_refs: list[str] = Field(
+        description="References (E1, E2...) of the tool results this section is based on"
+    )
+    notes: list[str] = Field(description="What you could not verify for this container; [] if none")
 
 
 class AgentAssessment(BaseModel):
@@ -64,7 +75,6 @@ class AgentAssessment(BaseModel):
     executive_summary: str
     overall_risk: Literal["critical", "high", "medium", "low"]
     findings: list[AgentFinding] = Field(description="Most urgent first")
-    recommendations: list[str]
     limitations: list[str]
 
 
@@ -91,28 +101,10 @@ class MCPServerInfo(BaseModel):
 
 
 class DockerEndpointInfo(BaseModel):
-    """Which Docker API endpoint a live run used, and whether it was the read-only proxy."""
+    """Which Docker API endpoint a live run used (the tools had full access to it)."""
 
     docker_host: str
-    require_proxy: bool  # config setting; False = the proxy requirement was disabled
-    proxy_verified: bool  # the endpoint refused GET /secrets with 403 (read-only proxy)
     docker_version: str = ""
-
-    @property
-    def unenforced_warning(self) -> str | None:
-        """Text for the run's security warning, or None when the proxy was enforced."""
-        if self.require_proxy:
-            return None
-        detected = (
-            "the read-only proxy was nevertheless detected"
-            if self.proxy_verified
-            else "the endpoint was NOT verified as the read-only proxy, so the MCP servers "
-            "may have had full, unfiltered Docker API access"
-        )
-        return (
-            f"SECURITY: require_proxy is disabled for this run. Docker endpoint "
-            f"'{self.docker_host}': {detected}."
-        )
 
 
 class ContainerRow(BaseModel):
@@ -173,7 +165,6 @@ class RunMetrics(BaseModel):
     tool_calls_agent: int = 0
     tool_calls_blocked: int = 0
     tool_calls_by_name: dict[str, int] = Field(default_factory=dict)
-    redactions: int = 0
     model_requests: int = 0
     input_tokens: int | None = None
     output_tokens: int | None = None
@@ -204,7 +195,7 @@ class Report(BaseModel):
     model: ModelInfo | None
     prompt_version: str
     mcp_servers: list[MCPServerInfo]
-    docker_endpoint: DockerEndpointInfo | None = None  # None in replay mode (no Docker access)
+    docker_endpoint: DockerEndpointInfo | None = None  # None when Docker was not contacted
     manifest_sha256: str | None = None  # outputs/<run_id>/manifest.json (see manifest.py)
     config_sha256: str | None = None  # same value = same experimental configuration
     snapshot_id: str
@@ -236,72 +227,7 @@ class AgentReport(BaseModel):
     snapshot_id: str
     executive_summary: str
     overall_risk: str | None  # None when the agent produced no valid assessment
-    findings: list[Finding]  # validated (status potential), in the agent's order
-    rejected: list[Finding]  # failed validation (kept for transparency)
-    out_of_scope: list[Finding]  # about excluded assessment infrastructure
-    recommendations: list[str]
+    findings: list[Finding]  # the agent's claims (status potential), in the agent's order
     limitations: list[str]
-    validation_notes: list[str]
     errors: list[str]
     metrics: RunMetrics
-
-
-# ---------------------------------------------------------------------------
-# 4. Agent vs deterministic
-# ---------------------------------------------------------------------------
-
-
-class FindingRef(BaseModel):
-    finding_id: str
-    rule_id: str
-    title: str
-    resource_name: str
-    severity: str
-
-
-class MatchedFinding(BaseModel):
-    """A deterministic finding and the agent findings that cover it."""
-
-    deterministic: FindingRef
-    agent_finding_ids: list[str]
-    agent_severity: str  # highest severity the agent gave it
-    severity_agreement: Literal["same", "higher", "lower"]  # agent vs deterministic
-
-
-class SeverityRecall(BaseModel):
-    severity: str
-    total: int
-    found: int
-
-
-class ComparisonScores(BaseModel):
-    deterministic_total: int
-    found: int
-    missed: int
-    recall: float  # found / total (0..1)
-    weighted_recall: float  # weighted by severity rank: critical 4 ... low 1, info 0
-    by_severity: list[SeverityRecall]
-    agent_total: int  # agent findings, excluding out-of-scope ones
-    agent_matched: int  # cover at least one deterministic finding
-    agent_unmatched: int  # validated, but cover no deterministic finding
-    agent_rejected: int  # failed validation
-    match_rate: float  # agent_matched / agent_total (0..1)
-    rejection_rate: float  # agent_rejected / agent_total (0..1)
-
-
-class Comparison(BaseModel):
-    """Contents of comparison.json."""
-
-    report_version: str = "2.0"
-    run_id: str
-    generated_at: datetime
-    model: ModelInfo
-    agent_status: str
-    snapshot_id: str
-    scores: ComparisonScores
-    found: list[MatchedFinding]  # deterministic findings the agent found
-    missed: list[FindingRef]  # deterministic findings the agent did not find
-    agent_unmatched: list[FindingRef]  # validated agent findings outside the rules
-    agent_rejected: list[FindingRef]  # agent findings that failed validation
-    agent_out_of_scope: list[FindingRef]  # agent findings on excluded infrastructure
-    method: list[str]  # how matching works, for the reader

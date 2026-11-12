@@ -6,8 +6,7 @@ A *finding* is one security statement about one resource, for example
 * ``evidence``  - the exact observed values that support it (inspect field
                   path + value, or a Trivy record), so a human can verify it;
 * ``status``    - ``confirmed`` when produced by a deterministic rule or the
-                  scanner, ``potential`` when inferred by the LLM, and
-                  ``rejected`` when the LLM's claim failed validation;
+                  scanner, ``potential`` when reported by the LLM;
 * ``source``    - who produced it: ``rule``, ``scanner`` or ``agent``.
 
 This separation is what lets the report say "these are facts" versus
@@ -56,7 +55,6 @@ class Confidence(StrEnum):
 class FindingStatus(StrEnum):
     CONFIRMED = "confirmed"
     POTENTIAL = "potential"
-    REJECTED = "rejected"
 
 
 class FindingSource(StrEnum):
@@ -85,7 +83,7 @@ class Evidence(BaseModel):
     source: str  # "docker_inspect", "docker_image_inspect", "docker_network", "trivy", "agent"
     resource: str  # resource name the fact was read from
     path: str  # where in the source document, e.g. "HostConfig.Privileged"
-    value: str  # observed value, stringified (already redacted)
+    value: str  # observed value, stringified
     note: str = ""
 
 
@@ -107,7 +105,6 @@ class Finding(BaseModel):
     explanation: str
     remediation: str
     references: list[str] = Field(default_factory=list)
-    validation_notes: list[str] = Field(default_factory=list)
 
     def sort_key(self) -> tuple:
         """Sort by severity, then confidence, then name (most important first)."""

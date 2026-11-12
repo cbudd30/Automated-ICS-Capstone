@@ -1,1 +1,1 @@
-"""Deterministic security checks, vulnerability parsing, scanning, and validation."""
+"""Deterministic security checks, vulnerability parsing and scanning."""

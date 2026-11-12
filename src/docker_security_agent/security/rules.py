@@ -751,12 +751,11 @@ def secret_env_names(c: ContainerAsset, ctx: RuleContext) -> list[Finding]:
             detail=",".join(hits),
             confidence=Confidence.MEDIUM,
             title=f"Credential-like environment variables: {', '.join(hits)}",
-            evidence=[_ev(c, "Config.Env", f"{n}=<redacted>", "value not collected") for n in hits],
+            evidence=[_ev(c, "Config.Env", n, "variable name; value not reported") for n in hits],
             explanation=(
                 "Secrets passed as environment variables are visible to anyone who can "
                 "inspect the container (docker inspect, /proc/<pid>/environ) and often leak "
-                "into logs and crash dumps. Values were redacted and not analysed; the name "
-                "alone indicates a likely credential."
+                "into logs and crash dumps. The name alone indicates a likely credential."
             ),
             remediation="Use Docker secrets / mounted secret files with restricted "
             "permissions, and rotate any credential that was exposed via the environment.",

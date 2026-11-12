@@ -8,8 +8,10 @@ There are two places tools are filtered:
    every call. This matters because a model can hallucinate a tool name, and
    because the application itself also calls tools (inventory collection).
 
-Neither of these is the real security boundary - the read-only socket proxy
-is. Policy is defence in depth and keeps the agent on task.
+Since harness h4 there is no read-only proxy: the MCP servers have full Docker
+access, so this policy is what keeps the agent to its approved tools. The
+containment boundary is the agent's container plus Docker Desktop sharing no
+Mac folders (docs/running-the-agent.md).
 
 Argument rules (configured in mcp_servers.yaml -> argument_policy):
 

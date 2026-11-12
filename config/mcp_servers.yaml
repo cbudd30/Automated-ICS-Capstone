@@ -8,14 +8,11 @@
 # `${VAR:-default}` placeholders are expanded from the environment / .env.
 # ---------------------------------------------------------------------------
 
-# Docker API endpoint handed to every MCP server. This MUST be the read-only
-# socket proxy (deploy/socket-proxy/compose.yml), never the raw socket.
-docker_host: "${DOCKER_AUDIT_DOCKER_HOST:-tcp://127.0.0.1:2375}"
-
-# Refuse to run if docker_host looks like a raw socket (unix:// or npipe://).
-# Set to false only if you understand that the MCP servers would then get
-# full, unfiltered Docker API access.
-require_proxy: true
+# Docker API endpoint handed to every MCP server: the Docker socket itself, so
+# the tools have FULL Docker access (no read-only proxy since 2026-11-09). What
+# keeps them inside Docker: the agent runs in a container (deploy/agent) and
+# Docker Desktop shares no Mac folders. See docs/running-the-agent.md.
+docker_host: "${DOCKER_AUDIT_DOCKER_HOST:-unix:///var/run/docker.sock}"
 
 servers:
   docker:
@@ -108,37 +105,3 @@ argument_policy:
     # "secret" scanning is excluded on purpose: it would return secret values.
     allowed_scan_types: ["vuln"]
     forced_output_format: json
-
-# Redaction of sensitive values BEFORE anything reaches the LLM, logs, or SQLite.
-redaction:
-  # Environment variables keep their NAME but lose their VALUE, except for
-  # these clearly non-sensitive names (exact match or glob pattern).
-  env_value_allowlist:
-    - PATH
-    - LANG
-    - LC_ALL
-    - LANGUAGE
-    - TZ
-    - HOME
-    - HOSTNAME
-    - TERM
-    - DEBIAN_FRONTEND
-    - NODE_ENV
-    - "*_VERSION"
-  # Any JSON key matching these (case-insensitive glob) has its value redacted.
-  sensitive_key_patterns:
-    - "*password*"
-    - "*passwd*"
-    - "*secret*"
-    - "*token*"
-    - "*api_key*"
-    - "*apikey*"
-    - "*private_key*"
-    - "*credential*"
-    - "*authorization*"
-    - "*auth_token*"
-  # Keys that match a pattern above but are known to be harmless. trivy-mcp's
-  # pagination cursor is called "next_token"; redacting it breaks paging.
-  sensitive_key_exceptions:
-    - next_token
-    - token_type

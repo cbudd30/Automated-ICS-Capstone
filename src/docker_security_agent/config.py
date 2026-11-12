@@ -5,7 +5,7 @@ variables (optionally from a ``.env`` file):
 
     models.yaml          -> ``ModelProfile`` per profile name
     agent.yaml           -> ``AgentConfig``  (limits, session DB, tracing)
-    mcp_servers.yaml     -> ``MCPConfig``    (servers, tool allow-lists, redaction)
+    mcp_servers.yaml     -> ``MCPConfig``    (servers, tool allow-lists)
     security_rules.yaml  -> ``RulesConfig``  (rule toggles, severities, lists)
     experiment.yaml      -> ``ExperimentConfig`` (objective, scan options, paths)
 
@@ -105,6 +105,8 @@ class AgentLimits(BaseModel):
     max_tool_calls: int = 100
     max_duration_seconds: float = 3600
     max_tool_result_chars: int = 12000
+    # h2: tool results kept in full before each model call; older ones become stubs
+    keep_recent_tool_outputs: int = 8
 
 
 class SessionConfig(BaseModel):
@@ -156,18 +158,10 @@ class ArgumentPolicy(BaseModel):
     scan_image: ScanImagePolicy = Field(default_factory=ScanImagePolicy)
 
 
-class RedactionConfig(BaseModel):
-    env_value_allowlist: list[str] = Field(default_factory=list)
-    sensitive_key_patterns: list[str] = Field(default_factory=list)
-    sensitive_key_exceptions: list[str] = Field(default_factory=list)
-
-
 class MCPConfig(BaseModel):
-    docker_host: str = "tcp://127.0.0.1:2375"
-    require_proxy: bool = True
+    docker_host: str = "unix:///var/run/docker.sock"
     servers: dict[str, MCPServerConfig]
     argument_policy: ArgumentPolicy = Field(default_factory=ArgumentPolicy)
-    redaction: RedactionConfig = Field(default_factory=RedactionConfig)
 
     def enabled_servers(self) -> list[MCPServerConfig]:
         return [s for s in self.servers.values() if s.enabled]

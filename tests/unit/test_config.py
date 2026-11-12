@@ -24,7 +24,7 @@ def test_real_config_loads():
     }
     assert not forbidden & set(s.mcp.servers["docker"].allowed_tools)
     assert "scan_filesystem" not in s.mcp.servers["trivy"].allowed_tools
-    assert s.mcp.require_proxy is True
+    assert s.mcp.docker_host.startswith("unix://")  # h4: the Docker socket, no proxy
 
 
 def test_profile_names_filled_from_keys():

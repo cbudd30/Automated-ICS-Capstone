@@ -2,7 +2,7 @@
 
 Commands
 --------
-  doctor               validate config, Docker proxy, MCP servers, Trivy DB, default model
+  doctor               validate config, Docker, MCP servers, Trivy DB, default model
   setup                one-time setup: install trivy-mcp plugin, download Trivy DB
   models               list model profiles and their capability status
   models --provider ollama   discover installed Ollama models (+ tool support)
@@ -11,8 +11,7 @@ Commands
   inventory            collect and print a Docker inventory snapshot (read-only)
   assess               run a full assessment (see pipeline.py)
   runs                 list previous runs
-  snapshots            list stored inventory snapshots (for --no-agent --snapshot replay)
-  report --run-id ID   print a stored report: --kind comparison | agent | deterministic
+  report --run-id ID   print a stored report: --kind agent | deterministic
 
 Every command loads configuration first; config errors are shown as a clean
 message instead of a traceback.
@@ -27,7 +26,6 @@ from typing import Annotated, Any
 import typer
 from rich.console import Console
 from rich.markdown import Markdown
-from rich.panel import Panel
 from rich.table import Table
 
 from docker_security_agent.config import ConfigError, Settings, load_settings
@@ -91,10 +89,10 @@ def doctor(
 
     ep = check_docker_endpoint(settings)
     table.add_row(
-        "Docker via read-only proxy",
+        "Docker",
         _ok(ep.ok),
-        f"{ep.docker_host} docker={ep.docker_version or '?'} "
-        f"filtered={ep.filtered}" + ("; " + "; ".join(ep.problems) if ep.problems else ""),
+        f"{ep.docker_host} docker={ep.docker_version or '?'}"
+        + ("; " + "; ".join(ep.problems) if ep.problems else ""),
     )
     problems += not ep.ok
 
@@ -165,12 +163,9 @@ def setup(
 
     ep = check_docker_endpoint(settings)
     if not ep.ok:
-        console.print(
-            "[yellow]Docker read-only proxy not detected.[/yellow] Start it with:\n"
-            "  docker compose -f deploy/socket-proxy/compose.yml up -d"
-        )
+        console.print("[yellow]" + "; ".join(ep.problems) + "[/yellow]")
     else:
-        console.print(f"Docker read-only proxy: [green]OK[/green] ({ep.docker_host})")
+        console.print(f"Docker: [green]OK[/green] ({ep.docker_host})")
 
 
 # ---------------------------------------------------------------------------
@@ -279,17 +274,14 @@ def models(
 def _guarded_servers(settings: Settings, roles=None):
     from docker_security_agent.mcp.policy import ToolPolicy
     from docker_security_agent.mcp.recorder import ToolCallRecorder
-    from docker_security_agent.mcp.redaction import Redactor
     from docker_security_agent.mcp.registry import build_servers
 
     recorder = ToolCallRecorder(settings.agent.limits.max_tool_calls)
-    return build_servers(
-        settings, ToolPolicy(settings.mcp), Redactor(settings.mcp.redaction), recorder, roles=roles
-    ), recorder
+    return build_servers(settings, ToolPolicy(settings.mcp), recorder, roles=roles), recorder
 
 
 def _collect_snapshot(settings: Settings):
-    """Read-only inventory via the proxy + Docker MCP server. Returns (snapshot, recorder)."""
+    """Inventory via the Docker MCP server. Returns (snapshot, recorder)."""
     from docker_security_agent.inventory.collector import collect_snapshot
     from docker_security_agent.mcp.registry import check_docker_endpoint, connect
 
@@ -423,7 +415,7 @@ def inventory(
 
     console.print(
         f"Snapshot [bold]{snap.snapshot_id}[/bold] — Docker {snap.docker_version} "
-        f"({snap.docker_platform}); {snap.redactions} values redacted"
+        f"({snap.docker_platform})"
     )
     t = Table(title=f"Containers ({len(snap.containers)})")
     for col in ("Name", "State", "Image", "User", "Priv", "CapAdd", "Ports", "Networks"):
@@ -463,35 +455,14 @@ def inventory(
 # ---------------------------------------------------------------------------
 
 
-def _security_warning(message: str) -> None:
-    console.print(
-        Panel(message, title="SECURITY WARNING", border_style="bold red", style="bold red")
-    )
-
-
 @app.command()
 def assess(
     model: Annotated[str | None, typer.Option(help="Model profile from config/models.yaml")] = None,
-    snapshot: Annotated[
-        str | None, typer.Option(help="With --no-agent: re-run the rules on a stored snapshot ID")
-    ] = None,
     no_agent: Annotated[bool, typer.Option("--no-agent", help="Rules + scanner only")] = False,
     no_scan: Annotated[bool, typer.Option("--no-scan", help="Skip Trivy image scans")] = False,
     session: Annotated[str | None, typer.Option(help="Continue a named agent session")] = None,
     objective: Annotated[str | None, typer.Option(help="Override the objective")] = None,
     skip_model_check: Annotated[bool, typer.Option(help="Skip capability preflight")] = False,
-    manifest: Annotated[
-        str | None,
-        typer.Option(
-            help="Re-run a manifest (file path or run ID) with its configuration: "
-            "deterministic runs on their pinned evidence, agent runs live (against the "
-            "same range baseline). Cannot be combined with "
-            "--model/--snapshot/--no-agent/--session/--objective."
-        ),
-    ] = None,
-    allow_drift: Annotated[
-        bool, typer.Option(help="With --manifest: run even if the prompt or schemas changed")
-    ] = False,
     range_baseline: Annotated[
         str | None,
         typer.Option(
@@ -501,37 +472,25 @@ def assess(
     ] = None,
 ) -> None:
     """Run an assessment; write the deterministic report, and with an agent also the
-    agent report and the comparison, to outputs/<RUN_ID>/."""
+    agent report, to outputs/<RUN_ID>/."""
     from docker_security_agent.pipeline import (
         AssessmentAborted,
         AssessOptions,
-        options_from_manifest,
         run_assessment,
     )
 
     settings = _settings()
     try:
-        if manifest:
-            if any([model, snapshot, no_agent, session, objective, range_baseline]):
-                raise ConfigError(
-                    "--manifest fixes the whole configuration; drop "
-                    "--model/--snapshot/--no-agent/--session/--objective/--range-baseline"
-                )
-            settings, opts = options_from_manifest(settings, manifest, allow_drift=allow_drift)
-            opts.skip_model_check = skip_model_check
-        else:
-            opts = AssessOptions(
-                model_profile=model,
-                snapshot_id=snapshot,
-                use_agent=not no_agent,
-                scan=False if no_scan else None,
-                session_name=session,
-                objective=objective,
-                skip_model_check=skip_model_check,
-                range_baseline=range_baseline,
-            )
+        opts = AssessOptions(
+            model_profile=model,
+            use_agent=not no_agent,
+            scan=False if no_scan else None,
+            session_name=session,
+            objective=objective,
+            skip_model_check=skip_model_check,
+            range_baseline=range_baseline,
+        )
         opts.progress = lambda msg: console.print(f"[dim]•[/dim] {msg}")
-        opts.warn = _security_warning
         result = asyncio.run(run_assessment(settings, opts))
     except (ConfigError, AssessmentAborted) as exc:
         console.print(f"[red]Assessment not started/aborted:[/red] {exc}")
@@ -547,30 +506,20 @@ def assess(
         "Deterministic findings: "
         + ", ".join(f"{k} {v}" for k, v in s.findings_by_severity.items())
     )
-    if result.agent_report and result.comparison:
-        a, sc = result.agent_report, result.comparison.scores
+    if result.agent_report:
+        a = result.agent_report
         console.print(
-            f"Agent ({a.agent_status}): {len(a.findings)} findings, {len(a.rejected)} rejected"
+            f"Agent ({a.agent_status}): {len(a.findings)} findings"
             + (f" · agent risk {a.overall_risk.upper()}" if a.overall_risk else "")
-        )
-        console.print(
-            f"Comparison: found {sc.found}/{sc.deterministic_total} deterministic findings "
-            f"(recall {sc.recall:.0%}, weighted {sc.weighted_recall:.0%}) · missed {sc.missed}"
-            f" · outside the rules {sc.agent_unmatched}"
         )
     console.print(f"Deterministic report: {result.md_path}")
     if result.agent_md_path:
         console.print(f"Agent report:         {result.agent_md_path}")
-    if result.comparison_md_path:
-        console.print(f"Comparison:           {result.comparison_md_path}")
     if result.manifest_path:
         console.print(
             f"Manifest: {result.manifest_path}\n          sha256 {result.report.manifest_sha256}"
             f"\n          config {result.report.config_sha256}"
         )
-    endpoint = result.report.docker_endpoint
-    if endpoint and endpoint.unenforced_warning:
-        _security_warning(endpoint.unenforced_warning)
     if result.report.errors:
         console.print("[yellow]Notes:[/yellow]")
         for e in result.report.errors[:10]:
@@ -708,36 +657,11 @@ def runs(limit: int = 20) -> None:
 
 
 @app.command()
-def snapshots(limit: int = 20) -> None:
-    """List stored inventory snapshots (use with `assess --snapshot`)."""
-    from docker_security_agent.memory.repository import AssessmentRepository
-
-    settings = _settings()
-    repo = AssessmentRepository(settings.assessment_db_path)
-    rows = repo.list_snapshots(limit)
-    repo.close()
-    t = Table(title="Inventory snapshots")
-    t.add_column("Snapshot ID", no_wrap=True)
-    for col in ("Captured", "Docker", "Containers", "Images", "Networks"):
-        t.add_column(col)
-    for r in rows:
-        t.add_row(
-            r["snapshot_id"],
-            r["captured_at"][:19],
-            r["docker_version"] or "",
-            str(r["container_count"]),
-            str(r["image_count"]),
-            str(r["network_count"]),
-        )
-    console.print(t)
-
-
-@app.command()
 def report(
     run_id: Annotated[str, typer.Option("--run-id", help="Run ID from `docker-audit runs`")],
     kind: Annotated[
-        str, typer.Option(help="comparison | agent | deterministic (default: comparison)")
-    ] = "comparison",
+        str, typer.Option(help="agent | deterministic (default: agent)")
+    ] = "agent",
     fmt: Annotated[str, typer.Option("--format", help="md | json | path")] = "md",
     raw: Annotated[bool, typer.Option(help="Print markdown source instead of rendering")] = False,
 ) -> None:
@@ -746,18 +670,16 @@ def report(
 
     from docker_security_agent.memory.repository import AssessmentRepository
     from docker_security_agent.reporting.agent_report import render_agent_markdown
-    from docker_security_agent.reporting.comparison_report import render_comparison_markdown
     from docker_security_agent.reporting.generator import render_markdown
     from docker_security_agent.schemas.reports import MCPServerInfo
 
-    if kind not in ("comparison", "agent", "deterministic"):
-        console.print("[red]--kind must be comparison, agent or deterministic[/red]")
+    if kind not in ("agent", "deterministic"):
+        console.print("[red]--kind must be agent or deterministic[/red]")
         raise typer.Exit(2)
     settings = _settings()
     repo = AssessmentRepository(settings.assessment_db_path)
     run = repo.get_run(run_id)
     stored: Any = {
-        "comparison": repo.load_comparison,
         "agent": repo.load_agent_report,
         "deterministic": repo.load_report,
     }[kind](run_id)
@@ -776,9 +698,7 @@ def report(
     elif fmt == "path":
         console.print(str(settings.output_dir / run_id))
     else:
-        if kind == "comparison":
-            md = render_comparison_markdown(stored)
-        elif kind == "agent":
+        if kind == "agent":
             servers = [MCPServerInfo(**s) for s in json.loads(run.get("mcp_servers_json") or "[]")]
             md = render_agent_markdown(stored, servers)
         else:

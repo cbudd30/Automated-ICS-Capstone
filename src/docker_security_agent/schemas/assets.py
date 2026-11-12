@@ -3,7 +3,7 @@
 ``docker inspect`` output is large and deeply nested. The parsers in
 ``inventory/parsers.py`` copy the *security-relevant* fields into these flat,
 typed models so the rule engine and the report never have to dig through raw
-JSON. The (already redacted) raw inspect document is kept alongside in
+JSON. The raw inspect document is kept alongside in
 ``raw`` so evidence can always be traced back to the original field.
 """
 
@@ -158,7 +158,6 @@ class InventorySnapshot(BaseModel):
     networks: list[NetworkAsset] = Field(default_factory=list)
     volumes: list[VolumeAsset] = Field(default_factory=list)
     collection_errors: list[str] = Field(default_factory=list)
-    redactions: int = 0  # how many values the sanitizer masked while collecting
 
     def compute_id(self) -> str:
         """Hash the parsed, security-relevant data (not timestamps) into a stable ID.
@@ -172,7 +171,6 @@ class InventorySnapshot(BaseModel):
             exclude={
                 "snapshot_id": True,
                 "captured_at": True,
-                "redactions": True,
                 "containers": {"__all__": {"raw", "created"}},
                 "images": {"__all__": {"raw"}},
                 "networks": {"__all__": {"raw"}},
@@ -182,7 +180,7 @@ class InventorySnapshot(BaseModel):
         digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
         return f"snap-{digest[:16]}"
 
-    # ---- lookup helpers used by rules, policy and validation
+    # ---- lookup helpers used by rules and policy
 
     def image_by_id(self, image_id: str) -> ImageAsset | None:
         return next((i for i in self.images if i.id == image_id), None)
@@ -217,15 +215,3 @@ class InventorySnapshot(BaseModel):
                 refs.add(c.image_ref)
         return refs
 
-    def resource_names(self) -> set[str]:
-        """Names/IDs of every resource; used to validate agent references."""
-        names: set[str] = set()
-        for c in self.containers:
-            names.update({c.name, c.id, c.id[:12]})
-        for i in self.images:
-            names.update({i.id, i.display_name, *i.tags, *i.digests})
-        for n in self.networks:
-            names.update({n.name, n.id, n.id[:12]})
-        for v in self.volumes:
-            names.add(v.name)
-        return names

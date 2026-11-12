@@ -20,11 +20,10 @@ class ToolCallRecord(BaseModel):
     phase: str
     server: str  # MCP server name, or "local" for function tools
     tool: str
-    arguments: dict[str, Any] = Field(default_factory=dict)  # redacted
+    arguments: dict[str, Any] = Field(default_factory=dict)
     status: str  # ok / error / blocked / budget_exhausted
     duration_ms: int = 0
     result_chars: int = 0
-    redactions: int = 0
     error: str | None = None
 
 

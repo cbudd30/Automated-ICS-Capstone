@@ -24,9 +24,8 @@ from docker_security_agent.schemas.findings import Finding
 from docker_security_agent.schemas.observations import (
     ImageScanResult,
     ToolCallRecord,
-    VulnerabilityRecord,
 )
-from docker_security_agent.schemas.reports import AgentReport, Comparison, Report
+from docker_security_agent.schemas.reports import AgentReport, Report
 
 
 def _now() -> str:
@@ -92,7 +91,6 @@ class AssessmentRepository:
             "metrics_json",
             "report_json",
             "agent_report_json",
-            "comparison_json",
         }
         cols, values = [], []
         for key, value in fields.items():
@@ -116,12 +114,6 @@ class AssessmentRepository:
             raise ValueError(f"run {run_id} does not exist or already has a manifest")
         self.conn.commit()
 
-    def load_manifest_json(self, run_id: str) -> str | None:
-        row = self.conn.execute(
-            "SELECT manifest_json FROM runs WHERE run_id = ?", (run_id,)
-        ).fetchone()
-        return row["manifest_json"] if row else None
-
     def get_run(self, run_id: str) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM runs WHERE run_id = ?", (run_id,)).fetchone()
         return dict(row) if row else None
@@ -141,9 +133,6 @@ class AssessmentRepository:
     def save_agent_report(self, run_id: str, report: AgentReport) -> None:
         self.update_run(run_id, agent_report_json=report.model_dump_json())
 
-    def save_comparison(self, run_id: str, comparison: Comparison) -> None:
-        self.update_run(run_id, comparison_json=comparison.model_dump_json())
-
     def _stored(self, run_id: str, column: str) -> str | None:
         run = self.get_run(run_id)
         return run.get(column) if run else None
@@ -155,10 +144,6 @@ class AssessmentRepository:
     def load_agent_report(self, run_id: str) -> AgentReport | None:
         text = self._stored(run_id, "agent_report_json")
         return AgentReport.model_validate_json(text) if text else None
-
-    def load_comparison(self, run_id: str) -> Comparison | None:
-        text = self._stored(run_id, "comparison_json")
-        return Comparison.model_validate_json(text) if text else None
 
     # -------------------------------------------------------------- snapshots
 
@@ -182,21 +167,6 @@ class AssessmentRepository:
             ),
         )
         self.conn.commit()
-
-    def load_snapshot(self, snapshot_id: str) -> InventorySnapshot | None:
-        row = self.conn.execute(
-            "SELECT data_json FROM snapshots WHERE snapshot_id = ?", (snapshot_id,)
-        ).fetchone()
-        return InventorySnapshot.model_validate_json(row["data_json"]) if row else None
-
-    def list_snapshots(self, limit: int = 20) -> list[dict[str, Any]]:
-        rows = self.conn.execute(
-            """SELECT snapshot_id, captured_at, docker_version, container_count, image_count,
-                      network_count, volume_count
-               FROM snapshots ORDER BY captured_at DESC LIMIT ?""",
-            (limit,),
-        ).fetchall()
-        return [dict(r) for r in rows]
 
     # ------------------------------------------------------------------ scans
 
@@ -245,71 +215,6 @@ class AssessmentRepository:
         assert scan_id is not None
         return scan_id
 
-    def latest_scan_ids_for_snapshot(self, snapshot_id: str) -> list[int]:
-        """IDs of the latest successful scan of each image for this snapshot.
-
-        Snapshots are content-addressed, so several live runs can share one and
-        each adds its own scans: "latest" changes over time. Runs record the IDs
-        they used in their manifest so a re-run loads exactly the same scans.
-        """
-        rows = self.conn.execute(
-            """SELECT scan_id, image_id FROM scans WHERE snapshot_id = ? AND status = 'ok'
-               ORDER BY scanned_at DESC, scan_id DESC""",
-            (snapshot_id,),
-        ).fetchall()
-        latest: dict[str, int] = {}
-        for r in rows:
-            latest.setdefault(r["image_id"], r["scan_id"])
-        return sorted(latest.values())
-
-    def load_scans_for_snapshot(self, snapshot_id: str) -> list[ImageScanResult]:
-        """Latest successful scan of each image for this snapshot (for replay runs)."""
-        return self.load_scans(self.latest_scan_ids_for_snapshot(snapshot_id))
-
-    def load_scans(self, scan_ids: list[int]) -> list[ImageScanResult]:
-        """Exactly these scans (any status). Raises KeyError if one is missing."""
-        rows = [
-            self.conn.execute("SELECT * FROM scans WHERE scan_id = ?", (i,)).fetchone()
-            for i in scan_ids
-        ]
-        missing = [i for i, r in zip(scan_ids, rows, strict=True) if r is None]
-        if missing:
-            raise KeyError(f"scan(s) not found: {missing}")
-        results = []
-        for r in rows:
-            vrows = self.conn.execute(
-                "SELECT * FROM vulnerabilities WHERE scan_id = ?", (r["scan_id"],)
-            ).fetchall()
-            results.append(
-                ImageScanResult(
-                    image_id=r["image_id"],
-                    image_ref=r["image_ref"],
-                    digest=r["digest"],
-                    scanner=r["scanner"],
-                    scanner_version=r["scanner_version"] or "",
-                    status=r["status"],
-                    error=r["error"],
-                    scanned_at=datetime.fromisoformat(r["scanned_at"]),
-                    duration_seconds=r["duration_seconds"] or 0.0,
-                    counts=json.loads(r["counts_json"] or "{}"),
-                    vulnerabilities=[
-                        VulnerabilityRecord(
-                            vuln_id=v["vuln_id"],
-                            package=v["package"] or "",
-                            installed_version=v["installed_version"] or "",
-                            fixed_version=v["fixed_version"] or "",
-                            has_fix=bool(v["has_fix"]),
-                            severity=v["severity"] or "UNKNOWN",
-                            artifact_type=v["artifact_type"] or "",
-                            target=v["target"] or "",
-                            finding_key=v["finding_key"] or "",
-                        )
-                        for v in vrows
-                    ],
-                )
-            )
-        return sorted(results, key=lambda s: s.image_id)
-
     # --------------------------------------------------------------- findings
 
     def save_findings(self, run_id: str, findings: list[Finding]) -> None:
@@ -348,8 +253,8 @@ class AssessmentRepository:
     def save_tool_calls(self, run_id: str, records: list[ToolCallRecord]) -> None:
         self.conn.executemany(
             """INSERT INTO tool_calls (run_id, timestamp, phase, server, tool, arguments_json,
-                   status, duration_ms, result_chars, redactions, error)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   status, duration_ms, result_chars, error)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [
                 (
                     run_id,
@@ -361,7 +266,6 @@ class AssessmentRepository:
                     r.status,
                     r.duration_ms,
                     r.result_chars,
-                    r.redactions,
                     r.error,
                 )
                 for r in records

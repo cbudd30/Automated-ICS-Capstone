@@ -43,7 +43,6 @@ class ToolCallRecorder:
         status: str,
         duration_ms: int = 0,
         result_chars: int = 0,
-        redactions: int = 0,
         error: str | None = None,
     ) -> ToolCallRecord:
         record = ToolCallRecord(
@@ -55,7 +54,6 @@ class ToolCallRecorder:
             status=status,
             duration_ms=duration_ms,
             result_chars=result_chars,
-            redactions=redactions,
             error=error,
         )
         self.records.append(record)
@@ -68,6 +66,3 @@ class ToolCallRecorder:
 
     def blocked(self) -> int:
         return sum(1 for r in self.records if r.status in ("blocked", "budget_exhausted"))
-
-    def total_redactions(self) -> int:
-        return sum(r.redactions for r in self.records)

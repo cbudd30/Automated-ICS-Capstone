@@ -26,13 +26,7 @@ case "$*" in
   "volume ls"*) printf 'grficsv3_plc_volume\ngrficsv3_scadalts_db\n' ;;
   "volume inspect"*) printf 'com.docker.compose.project=grficsv3\ncom.docker.compose.volume=x\n' ;;
   "run "*" date "*) echo 2026-10-16T10:00:00Z ;;
-  "run "*"-czf"*)
-    host=""; prev=""
-    for a in "$@"; do
-      case "$prev:$a" in -v:*:/to) host=${a%:/to} ;; esac
-      case "$prev" in -czf) echo "archive" > "$host/${a#/to/}" ;; esac
-      prev=$a
-    done ;;
+  "run "*"-czf -"*) echo "archive" ;;   # archive streamed to stdout (no Mac mount)
 esac
 exit 0
 """
@@ -110,12 +104,16 @@ def test_save_then_reset(env):
             for i, x in enumerate(c)
             if "volume create --label com.docker.compose.project=grficsv3" in x
         ),
-        next(i for i, x in enumerate(c) if "-xzf /from/grficsv3_plc_volume.tar.gz" in x),
+        next(i for i, x in enumerate(c) if " -i " in x and "-xzf -" in x and "plc_volume:/to" in x),
         next(i for i, x in enumerate(c) if "up -d --no-build --pull never" in x),
         c.index("AUDIT range verify base1 --since 2026-10-16T10:00:00Z --project grficsv3"),
     ]
     assert steps == sorted(steps)
     assert all(" -p grficsv3 " in x for x in c if " compose " in x)
+    # Volumes are streamed through Docker: no Mac folder is ever mounted (harness h4,
+    # Docker Desktop shares no Mac folders).
+    mounts = [a for x in c if " run " in x for a in x.split() if a.startswith("/") and ":/" in a]
+    assert mounts == []
 
 
 def test_refusals_happen_before_anything_is_removed(env):

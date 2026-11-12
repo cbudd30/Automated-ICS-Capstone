@@ -4,8 +4,8 @@ This is the *deterministic* evidence-collection step: the application (not
 the LLM) calls a fixed set of read-only tools so that every run - whatever
 model is used - starts from the same, complete picture of the environment.
 
-All calls go through ``GuardedMCPServer.collect`` so they are policy-checked,
-redacted and recorded exactly like agent calls.
+All calls go through ``GuardedMCPServer.collect`` so they are policy-checked
+and recorded exactly like agent calls.
 
 Tools used (all on the approved list):
     system_version   -> Docker engine version / platform
@@ -37,7 +37,6 @@ def _dicts(items: list[Any]) -> list[dict[str, Any]]:
 async def collect_snapshot(server: GuardedMCPServer) -> InventorySnapshot:
     """Build an ``InventorySnapshot``. Partial failures are recorded, not fatal."""
     snapshot = InventorySnapshot(captured_at=datetime.now(UTC))
-    redactions_before = server.recorder.total_redactions()
 
     async def _try(tool: str, args: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         try:
@@ -58,7 +57,6 @@ async def collect_snapshot(server: GuardedMCPServer) -> InventorySnapshot:
     snapshot.volumes = [parse_volume(d) for d in await _try("volume_list", {})]
 
     finalize_snapshot(snapshot)
-    snapshot.redactions = server.recorder.total_redactions() - redactions_before
     return snapshot
 
 

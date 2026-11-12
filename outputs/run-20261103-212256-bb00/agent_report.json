@@ -1,0 +1,2097 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261103-212256-bb00",
+  "generated_at": "2026-11-03T21:54:59.400910Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.2,
+      "max_tokens": null,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "prompt_version": "v6",
+  "agent_status": "ok",
+  "snapshot_id": "snap-69b1cd146a835f16",
+  "executive_summary": "The Docker environment hosting the ICS lab has critical security gaps. Five containers (router, caldera, HMI, simulation, plc) run with elevated privileges (CAP_NET_ADMIN, root user) and expose sensitive networks (admin/ICS/DMZ). Image vulnerabilities are rampant: 195 in router, 1404 in caldera, 168 in HMI, 1600 in simulation, and 1599 in plc. The simulation and EWS containers have Docker socket mounts, enabling host-level control. Resource limits are missing across all containers, risking availability. Immediate remediation is required to prevent lateral movement and process disruption.",
+  "overall_risk": "critical",
+  "findings": [
+    {
+      "id": "F-AGENT-b34ca67d67",
+      "rule_id": "AGENT",
+      "title": "Elevated Capabilities",
+      "resource_type": "unknown",
+      "resource_name": "router",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "router",
+          "path": "HostConfig.CapAdd",
+          "value": "[CAP_NET_ADMIN, CAP_NET_RAW]",
+          "note": ""
+        }
+      ],
+      "explanation": "CAP_NET_ADMIN and CAP_NET_RAW allow full network control and raw socket access, which could enable an attacker to manipulate routing tables or perform network-based attacks on the ICS network.",
+      "remediation": "Remove unnecessary capabilities by setting CapDrop instead of CapAdd in Docker Compose or CLI.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-5a35e3b0d7",
+      "rule_id": "AGENT",
+      "title": "Multiple Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "router",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "router",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_b-ics-net, grficsv3_c-dmz-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container bridges admin, ICS, and DMZ networks, creating a potential attack vector between network segments. ICS networks should be isolated from DMZ to prevent lateral movement.",
+      "remediation": "Use network segmentation with dedicated networks for each service and avoid multi-network containers.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-889445787d",
+      "rule_id": "AGENT",
+      "title": "Image Vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "router",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2023-2953",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2023-45853",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-100236",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-11822",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-12064",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-13221",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-16742",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-42496",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-42497",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-53613",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-54369",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-6276",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-7210",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-76642",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-77214",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-78409",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-78410",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-8286",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-8376",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-8458",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-86562",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-86563",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-86565",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-86567",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-86848",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-8927",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "router",
+          "path": "vulnerability",
+          "value": "CVE-2026-9538",
+          "note": ""
+        }
+      ],
+      "explanation": "The container image contains 195 high/critical vulnerabilities in core packages like perl, OpenSSL, and network utilities. Exploitation could lead to privilege escalation or network disruption in the ICS environment.",
+      "remediation": "Rebuild the image with updated packages or switch to a hardened base image. Apply network restrictions to limit exposure.",
+      "references": [
+        "CVE-2023-2953",
+        "CVE-2023-45853",
+        "CVE-2026-100236",
+        "CVE-2026-11822",
+        "CVE-2026-12064",
+        "CVE-2026-13221",
+        "CVE-2026-16742",
+        "CVE-2026-42496",
+        "CVE-2026-42497",
+        "CVE-2026-53613",
+        "CVE-2026-54369",
+        "CVE-2026-6276",
+        "CVE-2026-7210",
+        "CVE-2026-76642",
+        "CVE-2026-77214",
+        "CVE-2026-78409",
+        "CVE-2026-78410",
+        "CVE-2026-8286",
+        "CVE-2026-8376",
+        "CVE-2026-8458",
+        "CVE-2026-86562",
+        "CVE-2026-86563",
+        "CVE-2026-86565",
+        "CVE-2026-86567",
+        "CVE-2026-86848",
+        "CVE-2026-8927",
+        "CVE-2026-9538"
+      ],
+      "validation_notes": [
+        "unverified fields ignored: batchID"
+      ]
+    },
+    {
+      "id": "F-AGENT-a151ce978c",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "router",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "router",
+          "path": "Config.User",
+          "value": "''",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-77817704e1",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "router",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "router",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "router",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-ea8297eb0a",
+      "rule_id": "AGENT",
+      "title": "Image Vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "caldera",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2022-23806",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2023-24538",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2023-24540",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2023-45853",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2024-24790",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2025-68121",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2025-7458",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2026-78667",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "caldera",
+          "path": "vulnerability",
+          "value": "CVE-2026-78669",
+          "note": ""
+        }
+      ],
+      "explanation": "The container image contains 85 critical and 1319 high-severity vulnerabilities in core packages like golang, OpenSSL, and SQLite. Caldera is an attack framework; a compromised instance could exploit these to gain host-level access or disrupt the ICS network.",
+      "remediation": "Rebuild the image with updated packages or switch to a hardened base image. Remove the container from the admin network and restrict access to the DMZ network only.",
+      "references": [
+        "CVE-2022-23806",
+        "CVE-2023-24538",
+        "CVE-2023-24540",
+        "CVE-2023-45853",
+        "CVE-2024-24790",
+        "CVE-2025-68121",
+        "CVE-2025-7458",
+        "CVE-2026-78667",
+        "CVE-2026-78669"
+      ],
+      "validation_notes": [
+        "unverified fields ignored: batchID"
+      ]
+    },
+    {
+      "id": "F-AGENT-c911bed87f",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "caldera",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "caldera",
+          "path": "Config.User",
+          "value": "''",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases the risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-2545e4e51f",
+      "rule_id": "AGENT",
+      "title": "Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "caldera",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "caldera",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_c-dmz-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container is on both admin and DMZ networks. Caldera is an attack framework; its presence on the admin network could allow lateral movement to other critical ICS services.",
+      "remediation": "Isolate Caldera to the DMZ network only. Use network policies to restrict communication between networks.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-7af47036d6",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "caldera",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "caldera",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-8e831c39b5",
+      "rule_id": "AGENT",
+      "title": "Image Vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "HMI",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2017-15095",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2017-17485",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2017-7525",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-11307",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-14718",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-14719",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-14720",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-14721",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-19360",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-19361",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-19362",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2018-7489",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-14379",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-14540",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-16335",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-16942",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-16943",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-17267",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-17531",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2019-20330",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2020-35491",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2020-36179",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2020-8840",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2020-9547",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2020-9548",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2022-22965",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2022-22978",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2022-23305",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2022-23307",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-22732",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-34487",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-41845",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-43512",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-43515",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-44487",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-45623",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-47884",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-54466",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-65182",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-65905",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-68525",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-69219",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "HMI",
+          "path": "vulnerability",
+          "value": "CVE-2026-91777",
+          "note": ""
+        }
+      ],
+      "explanation": "The container image contains 86 critical and 159 high-severity vulnerabilities in Java libraries (e.g., Jackson, Tomcat, Spring) and Node.js packages. HMI systems are critical for operator interaction; a compromised HMI could allow attackers to manipulate process data or disrupt operations.",
+      "remediation": "Rebuild the image with updated libraries (e.g., Tomcat 9.0.118, Spring 5.2.20) and remove unnecessary capabilities like CAP_NET_ADMIN. Isolate the HMI to the admin network only.",
+      "references": [
+        "CVE-2017-15095",
+        "CVE-2017-17485",
+        "CVE-2017-7525",
+        "CVE-2018-11307",
+        "CVE-2018-14718",
+        "CVE-2018-14719",
+        "CVE-2018-14720",
+        "CVE-2018-14721",
+        "CVE-2018-19360",
+        "CVE-2018-19361",
+        "CVE-2018-19362",
+        "CVE-2018-7489",
+        "CVE-2019-14379",
+        "CVE-2019-14540",
+        "CVE-2019-16335",
+        "CVE-2019-16942",
+        "CVE-2019-16943",
+        "CVE-2019-17267",
+        "CVE-2019-17531",
+        "CVE-2019-20330",
+        "CVE-2020-35491",
+        "CVE-2020-36179",
+        "CVE-2020-8840",
+        "CVE-2020-9547",
+        "CVE-2020-9548",
+        "CVE-2022-22965",
+        "CVE-2022-22978",
+        "CVE-2022-23305",
+        "CVE-2022-23307",
+        "CVE-2026-22732",
+        "CVE-2026-34487",
+        "CVE-2026-41845",
+        "CVE-2026-43512",
+        "CVE-2026-43515",
+        "CVE-2026-44487",
+        "CVE-2026-45623",
+        "CVE-2026-47884",
+        "CVE-2026-54466",
+        "CVE-2026-65182",
+        "CVE-2026-65905",
+        "CVE-2026-68525",
+        "CVE-2026-69219",
+        "CVE-2026-91777"
+      ],
+      "validation_notes": [
+        "unverified fields ignored: batchID"
+      ]
+    },
+    {
+      "id": "F-AGENT-9e92389a35",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "HMI",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "HMI",
+          "path": "Config.User",
+          "value": "''",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases the risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-be6b45227a",
+      "rule_id": "AGENT",
+      "title": "Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "HMI",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "HMI",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_c-dmz-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container is on both admin and DMZ networks. HMI systems should be isolated to the admin network to prevent lateral movement from the DMZ.",
+      "remediation": "Remove the container from the DMZ network and ensure it's only on the admin network. Use network policies to restrict access.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-621d9a03e1",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "HMI",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "HMI",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-742c8e37c2",
+      "rule_id": "AGENT",
+      "title": "Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "kali",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "kali",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_c-dmz-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container is on both admin and DMZ networks. Kali Linux is a penetration testing tool; its presence on the admin network could allow lateral movement to other critical ICS services.",
+      "remediation": "Isolate Kali to the DMZ network only. Use network policies to restrict communication between networks.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-06e8c4c933",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "kali",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "kali",
+          "path": "Config.User",
+          "value": "root",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases the risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-e4f6817362",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "kali",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "kali",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "kali",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-9f9707fa6d",
+      "rule_id": "AGENT",
+      "title": "Image Vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "EWS",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2023-49569",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2023-53867",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2024-24790",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2024-50286",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2025-21613",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2025-37777",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2025-68121",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-24049",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-25681",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-27136",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-33186",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-39828",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-39830",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-39831",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-41066",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-46597",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-63825",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-63940",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-68426",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-72399",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-74345",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-78669",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-84445",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-89530",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-89652",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-89659",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-89708",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-90037",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-90162",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-93221",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "EWS",
+          "path": "vulnerability",
+          "value": "CVE-2026-98365",
+          "note": ""
+        }
+      ],
+      "explanation": "The container image contains 36 critical and 704 high-severity vulnerabilities in core packages like Linux kernel, Go, and Python. EWS is a critical component for operator workstations; a compromised EWS could allow attackers to execute arbitrary code or disrupt ICS operations.",
+      "remediation": "Rebuild the image with updated packages (e.g., Linux kernel 5.15.0-198.208+, Go 1.21.11+, Python 3.11.10+). Remove CAP_NET_ADMIN and isolate the container to the admin network only.",
+      "references": [
+        "CVE-2023-49569",
+        "CVE-2023-53867",
+        "CVE-2024-24790",
+        "CVE-2024-50286",
+        "CVE-2025-21613",
+        "CVE-2025-37777",
+        "CVE-2025-68121",
+        "CVE-2026-24049",
+        "CVE-2026-25681",
+        "CVE-2026-27136",
+        "CVE-2026-33186",
+        "CVE-2026-39828",
+        "CVE-2026-39830",
+        "CVE-2026-39831",
+        "CVE-2026-41066",
+        "CVE-2026-46597",
+        "CVE-2026-63825",
+        "CVE-2026-63940",
+        "CVE-2026-68426",
+        "CVE-2026-72399",
+        "CVE-2026-74345",
+        "CVE-2026-78669",
+        "CVE-2026-84445",
+        "CVE-2026-89530",
+        "CVE-2026-89652",
+        "CVE-2026-89659",
+        "CVE-2026-89708",
+        "CVE-2026-90037",
+        "CVE-2026-90162",
+        "CVE-2026-93221",
+        "CVE-2026-98365"
+      ],
+      "validation_notes": [
+        "unverified fields ignored: batchID"
+      ]
+    },
+    {
+      "id": "F-AGENT-115d61a533",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "EWS",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "EWS",
+          "path": "Config.User",
+          "value": "root",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases the risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-a35139491a",
+      "rule_id": "AGENT",
+      "title": "Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "EWS",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "EWS",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_b-ics-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container is on both admin and ICS networks. EWS workstations should be isolated to the admin network to prevent lateral movement to the ICS network.",
+      "remediation": "Remove the container from the ICS network and ensure it's only on the admin network. Use network policies to restrict access.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-622ea665f5",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "EWS",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "EWS",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-64c9b49ecd",
+      "rule_id": "AGENT",
+      "title": "Docker Socket Mount",
+      "resource_type": "unknown",
+      "resource_name": "simulation",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "Mounts[0].Source",
+          "value": "/var/run/docker.sock",
+          "note": ""
+        }
+      ],
+      "explanation": "Mounting the Docker socket allows the container to control the Docker host and manage other containers, creating a high-risk attack vector if compromised.",
+      "remediation": "Remove the Docker socket mount from the container configuration.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-074cc5cc68",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "simulation",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "Config.User",
+          "value": "''",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases the risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-aa02774d6b",
+      "rule_id": "AGENT",
+      "title": "Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "simulation",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_b-ics-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container is on both admin and ICS networks. Simulation containers should be isolated to the ICS network to prevent lateral movement to admin services.",
+      "remediation": "Remove the container from the admin network and ensure it's only on the ICS network. Use network policies to restrict communication.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-ff798e191b",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "simulation",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-5dbf735580",
+      "rule_id": "AGENT",
+      "title": "Image Vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "plc",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2021-29921",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2022-37454",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2023-45853",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2024-47685",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2024-56171",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-13221",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-23112",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-33845",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-40356",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-42010",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-42496",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-43037",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-54369",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-6653",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-68123",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-68140",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-74583",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-8376",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-89638",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-89708",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-90003",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-90037",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-93221",
+          "note": ""
+        },
+        {
+          "source": "agent:trivy",
+          "resource": "plc",
+          "path": "vulnerability",
+          "value": "CVE-2026-98084",
+          "note": ""
+        }
+      ],
+      "explanation": "The container image contains 55 critical and 1544 high-severity vulnerabilities in core packages like Linux kernel, OpenSSL, and Python. PLCs control physical processes; a compromised PLC could cause operational disruptions or safety incidents.",
+      "remediation": "Rebuild the image with updated packages (e.g., Linux kernel 5.10.257+, OpenSSL 3.0.19+, Python 3.9.2+). Remove CAP_NET_ADMIN and isolate the container to the ICS network only.",
+      "references": [
+        "CVE-2021-29921",
+        "CVE-2022-37454",
+        "CVE-2023-45853",
+        "CVE-2024-47685",
+        "CVE-2024-56171",
+        "CVE-2026-13221",
+        "CVE-2026-23112",
+        "CVE-2026-33845",
+        "CVE-2026-40356",
+        "CVE-2026-42010",
+        "CVE-2026-42496",
+        "CVE-2026-43037",
+        "CVE-2026-54369",
+        "CVE-2026-6653",
+        "CVE-2026-68123",
+        "CVE-2026-68140",
+        "CVE-2026-74583",
+        "CVE-2026-8376",
+        "CVE-2026-89638",
+        "CVE-2026-89708",
+        "CVE-2026-90003",
+        "CVE-2026-90037",
+        "CVE-2026-93221",
+        "CVE-2026-98084"
+      ],
+      "validation_notes": [
+        "unverified fields ignored: batchID"
+      ]
+    },
+    {
+      "id": "F-AGENT-5dbd79bde1",
+      "rule_id": "AGENT",
+      "title": "Root Privileges",
+      "resource_type": "unknown",
+      "resource_name": "plc",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "plc",
+          "path": "Config.User",
+          "value": "''",
+          "note": ""
+        }
+      ],
+      "explanation": "Running as root increases the risk of privilege escalation if any vulnerabilities exist in the container's software stack.",
+      "remediation": "Set a non-root user in Docker Compose or Dockerfile using the 'user' directive.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-8dbc3c9b4a",
+      "rule_id": "AGENT",
+      "title": "Network Exposure",
+      "resource_type": "unknown",
+      "resource_name": "plc",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "plc",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_b-ics-net",
+          "note": "value differs from the inspect data"
+        }
+      ],
+      "explanation": "The container is on both admin and ICS networks. PLCs should be isolated to the ICS network to prevent lateral movement from admin services.",
+      "remediation": "Remove the container from the admin network and ensure it's only on the ICS network. Use network policies to restrict access.",
+      "references": [],
+      "validation_notes": [
+        "some observed values differ from the inspect data"
+      ]
+    },
+    {
+      "id": "F-AGENT-b8dd4700f5",
+      "rule_id": "AGENT",
+      "title": "Missing Resource Limits",
+      "resource_type": "unknown",
+      "resource_name": "plc",
+      "resource_id": "",
+      "category": "other",
+      "severity": "medium",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "plc",
+          "path": "HostConfig.CpuShares",
+          "value": "0",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "plc",
+          "path": "HostConfig.Memory",
+          "value": "0",
+          "note": ""
+        }
+      ],
+      "explanation": "Unbounded CPU and memory usage could allow resource exhaustion attacks against the ICS network.",
+      "remediation": "Add CPU and memory limits in Docker Compose or CLI with --memory and --cpu-shares.",
+      "references": [],
+      "validation_notes": []
+    },
+    {
+      "id": "F-AGENT-844939d47c",
+      "rule_id": "AGENT",
+      "title": "Docker Socket Mounts",
+      "resource_type": "unknown",
+      "resource_name": "simulation",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "medium",
+      "status": "potential",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "Mounts[0].Source",
+          "value": "/var/run/docker.sock",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "simulation",
+          "path": "Mounts[0].Source",
+          "value": "/var/run/docker.sock",
+          "note": ""
+        }
+      ],
+      "explanation": "Mounting the Docker socket in simulation and EWS containers grants full host control. A compromised container could manipulate other containers or the host OS.",
+      "remediation": "Remove Docker socket mounts from all containers. Use Docker API access controls or dedicated monitoring tools instead of direct socket access.",
+      "references": [],
+      "validation_notes": []
+    }
+  ],
+  "rejected": [
+    {
+      "id": "F-AGENT-4bfeb9dff7",
+      "rule_id": "AGENT",
+      "title": "Image Vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "simulation",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "rejected",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:findings_list",
+          "resource": "simulation",
+          "path": "batchID",
+          "value": "f4876dff-ccf7-448d-a9c2-439c790e19fc",
+          "note": ""
+        }
+      ],
+      "explanation": "The container image contains 7 critical and 157 high-severity vulnerabilities in core packages like OpenSSL, libxml2, and Python. Simulation containers often run long-term processes; a compromised simulation could disrupt ICS operations or act as a pivot point.",
+      "remediation": "Rebuild the image with updated packages (e.g., OpenSSL 3.0.19+, libxml2 2.10.4+). Remove the Docker socket mount and isolate the container to the ICS network only.",
+      "references": [
+        "CVE-2023-45853",
+        "CVE-2026-103111",
+        "CVE-2026-11822",
+        "CVE-2026-11824",
+        "CVE-2026-11940",
+        "CVE-2026-12064",
+        "CVE-2026-15176",
+        "CVE-2026-23449",
+        "CVE-2026-24049",
+        "CVE-2026-25681",
+        "CVE-2026-31789",
+        "CVE-2026-33845",
+        "CVE-2026-40355",
+        "CVE-2026-40356",
+        "CVE-2026-42009",
+        "CVE-2026-42010",
+        "CVE-2026-43049",
+        "CVE-2026-45447",
+        "CVE-2026-53375",
+        "CVE-2026-53613",
+        "CVE-2026-53615",
+        "CVE-2026-56153",
+        "CVE-2026-6276",
+        "CVE-2026-63292",
+        "CVE-2026-63686",
+        "CVE-2026-63718",
+        "CVE-2026-63819",
+        "CVE-2026-64394",
+        "CVE-2026-64557",
+        "CVE-2026-6653",
+        "CVE-2026-7210",
+        "CVE-2026-72110",
+        "CVE-2026-72338",
+        "CVE-2026-72380",
+        "CVE-2026-74506",
+        "CVE-2026-74510",
+        "CVE-2026-76642",
+        "CVE-2026-78408",
+        "CVE-2026-78409",
+        "CVE-2026-78410",
+        "CVE-2026-78669",
+        "CVE-2026-80837",
+        "CVE-2026-80864",
+        "CVE-2026-80883",
+        "CVE-2026-8286",
+        "CVE-2026-84782",
+        "CVE-2026-86138",
+        "CVE-2026-86142",
+        "CVE-2026-86143",
+        "CVE-2026-86144",
+        "CVE-2026-89157",
+        "CVE-2026-89161",
+        "CVE-2026-8927",
+        "CVE-2026-89537",
+        "CVE-2026-90104",
+        "CVE-2026-90321",
+        "CVE-2026-90392",
+        "CVE-2026-93479",
+        "CVE-2026-93787",
+        "CVE-2026-93796",
+        "CVE-2026-97205",
+        "CVE-2026-97530",
+        "CVE-2026-97687",
+        "CVE-2026-97689",
+        "CVE-2026-98104",
+        "CVE-2026-98107",
+        "CVE-2026-98260",
+        "CVE-2026-98332"
+      ],
+      "validation_notes": [
+        "cites CVEs Trivy reported for other images, not simulation: CVE-2026-23449, CVE-2026-25681, CVE-2026-43049, CVE-2026-53375, CVE-2026-63819, CVE-2026-64394, CVE-2026-64557, CVE-2026-72110, CVE-2026-72338, CVE-2026-72380, CVE-2026-74506, CVE-2026-74510, CVE-2026-78669, CVE-2026-80837, CVE-2026-80864, CVE-2026-80883, CVE-2026-89537, CVE-2026-90104, CVE-2026-90321, CVE-2026-90392, CVE-2026-93787, CVE-2026-93796, CVE-2026-97530, CVE-2026-98104, CVE-2026-98107, CVE-2026-98260, CVE-2026-98332",
+        "unverified fields ignored: batchID"
+      ]
+    },
+    {
+      "id": "F-AGENT-e1d6fde913",
+      "rule_id": "AGENT",
+      "title": "Multi-Network Bridging",
+      "resource_type": "unknown",
+      "resource_name": "grficsv3_a-grfics-admin",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "rejected",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:container_inspect",
+          "resource": "grficsv3_a-grfics-admin",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_b-ics-net, grficsv3_c-dmz-net",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "grficsv3_a-grfics-admin",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_c-dmz-net",
+          "note": ""
+        },
+        {
+          "source": "agent:container_inspect",
+          "resource": "grficsv3_a-grfics-admin",
+          "path": "NetworkSettings.Networks",
+          "value": "grficsv3_a-grfics-admin, grficsv3_b-ics-net",
+          "note": ""
+        }
+      ],
+      "explanation": "Containers bridge admin, ICS, and DMZ networks, violating OT segmentation principles. A compromised container could pivot between network segments, targeting critical ICS components.",
+      "remediation": "Implement strict network isolation: admin network only for management services, ICS network only for process systems, and DMZ for external access. Use Docker network policies to enforce segmentation.",
+      "references": [],
+      "validation_notes": [
+        "no verifiable evidence (no matching field or vulnerability ID)",
+        "unverified fields ignored: NetworkSettings.Networks, NetworkSettings.Networks, NetworkSettings.Networks"
+      ]
+    }
+  ],
+  "out_of_scope": [],
+  "recommendations": [
+    "Isolate ICS containers to dedicated networks with no cross-segment communication (admin/ICS/DMZ separation).",
+    "Remove CAP_NET_ADMIN and other unnecessary capabilities from all containers.",
+    "Set non-root users in Docker Compose files (user directive) for all containers.",
+    "Add CPU and memory limits to all containers to prevent resource exhaustion.",
+    "Rebuild all images with updated packages (e.g., OpenSSL 3.0.19+, Python 3.11.10+).",
+    "Remove Docker socket mounts from simulation and EWS containers."
+  ],
+  "limitations": [
+    "docker-audit-socket-proxy container was excluded as per user instructions.",
+    "Some vulnerabilities (e.g., CVE-2026-84782) have no available fixes in the scanned images.",
+    "Image rebuilds may require source access for non-ICS components like caldera and kali."
+  ],
+  "validation_notes": [
+    "finding 'Image Vulnerabilities' rejected: cites CVEs Trivy reported for other images, not simulation: CVE-2026-23449, CVE-2026-25681, CVE-2026-43049, CVE-2026-53375, CVE-2026-63819, CVE-2026-64394, CVE-2026-64557, CVE-2026-72110, CVE-2026-72338, CVE-2026-72380, CVE-2026-74506, CVE-2026-74510, CVE-2026-78669, CVE-2026-80837, CVE-2026-80864, CVE-2026-80883, CVE-2026-89537, CVE-2026-90104, CVE-2026-90321, CVE-2026-90392, CVE-2026-93787, CVE-2026-93796, CVE-2026-97530, CVE-2026-98104, CVE-2026-98107, CVE-2026-98260, CVE-2026-98332",
+    "finding 'Multi-Network Bridging' rejected: no verifiable evidence (no matching field or vulnerability ID)"
+  ],
+  "errors": [],
+  "metrics": {
+    "started_at": "2026-11-03T21:22:56.490666Z",
+    "finished_at": "2026-11-03T21:54:59.392331Z",
+    "duration_seconds": 1922.93,
+    "collection_seconds": 0.91,
+    "scan_seconds": 21.5,
+    "agent_seconds": 1899.96,
+    "tool_calls_total": 492,
+    "tool_calls_agent": 39,
+    "tool_calls_blocked": 1,
+    "tool_calls_by_name": {
+      "docker.system_version": 1,
+      "docker.container_list": 3,
+      "docker.image_list": 2,
+      "docker.network_list": 1,
+      "docker.volume_list": 1,
+      "trivy.trivy_version": 1,
+      "trivy.scan_image": 16,
+      "trivy.findings_list": 446,
+      "docker.container_inspect": 7,
+      "docker.image_inspect": 7,
+      "harness.record_container_section": 7
+    },
+    "redactions": 467,
+    "model_requests": 40,
+    "input_tokens": 1468798,
+    "output_tokens": 31007,
+    "total_tokens": 1499805
+  }
+}

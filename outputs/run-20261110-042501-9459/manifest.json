@@ -1,0 +1,204 @@
+{
+  "config_sha256": "60852d7e79d65b3ca254a69283e51000c63afeef2822b9d5ab012a3d3806fa35",
+  "manifest": {
+    "acquisition": {
+      "argument_policy": {
+        "scan_image": {
+          "allowed_scan_types": [
+            "vuln"
+          ],
+          "forced_output_format": "json",
+          "restrict_targets_to_inventory": true
+        }
+      },
+      "docker_endpoint": {
+        "docker_host": "unix:///var/run/docker.sock",
+        "docker_version": "29.7.2"
+      },
+      "mcp_servers": [
+        {
+          "allowed_tools": [
+            "container_list",
+            "container_inspect",
+            "image_list",
+            "image_inspect",
+            "image_history",
+            "network_list",
+            "network_inspect",
+            "volume_list",
+            "volume_inspect",
+            "system_info",
+            "system_version"
+          ],
+          "args": [
+            "docker-mcp-server==2.2.7"
+          ],
+          "command": "uvx",
+          "env_names": [
+            "DOCKER_MCP_SERVER_READONLY"
+          ],
+          "name": "docker",
+          "role": "docker_inspection"
+        },
+        {
+          "allowed_tools": [
+            "scan_image",
+            "findings_list",
+            "findings_get",
+            "trivy_version"
+          ],
+          "args": [
+            "mcp",
+            "--transport",
+            "stdio"
+          ],
+          "command": "trivy",
+          "env_names": [],
+          "name": "trivy",
+          "role": "image_scanner"
+        }
+      ],
+      "mode": "deterministic",
+      "range_check": {
+        "last_reset_at": null,
+        "last_reset_matched": null,
+        "verified_at": "2026-11-10T04:25:02.847019Z"
+      },
+      "redaction": {},
+      "scan": {
+        "enabled": true,
+        "max_images": 0,
+        "page_size": 500,
+        "scope": "used",
+        "severities": [
+          "CRITICAL",
+          "HIGH",
+          "MEDIUM",
+          "LOW",
+          "UNKNOWN"
+        ]
+      }
+    },
+    "created_at": "2026-11-10T04:28:45.504123Z",
+    "experiment": {
+      "agent": null,
+      "evidence": {
+        "scan_ids": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "snapshot_id": "snap-67c80143445ff453"
+      },
+      "logging": {
+        "record_conversation": false,
+        "record_findings": true,
+        "record_tool_calls": true,
+        "tracing_enabled": false
+      },
+      "models": {},
+      "objective": "Assess the security posture of the Docker environment hosting a containerized industrial control system (ICS) lab. Identify container misconfigurations, risky network exposure, missing resource limits, and known image vulnerabilities. Prioritise risks by their impact on an OT environment and give concrete, evidence-based remediation for defenders.",
+      "prompt_bundle": {
+        "harness_version": "h4",
+        "instructions_sha256": "54da8bc8471035631fba78a8427a97fbd125d5a44fa2b27422399b2bf6bf4c11",
+        "shaping_version": "s2",
+        "version": "v8"
+      },
+      "range_baseline": {
+        "baseline_snapshot_id": "snap-9f954ef8237eb745",
+        "fingerprint_sha256": "6aa185c2ecd4a467258a356544cd481309e4f06b14afd990c6522b858db2ee7d",
+        "name": "clean-v2"
+      },
+      "rules": {
+        "dangerous_capabilities": {
+          "ALL": "critical",
+          "AUDIT_CONTROL": "medium",
+          "BPF": "high",
+          "DAC_READ_SEARCH": "high",
+          "MKNOD": "low",
+          "NET_ADMIN": "medium",
+          "NET_RAW": "medium",
+          "PERFMON": "medium",
+          "SYS_ADMIN": "critical",
+          "SYS_MODULE": "critical",
+          "SYS_PTRACE": "high",
+          "SYS_RAWIO": "high",
+          "SYS_TIME": "medium"
+        },
+        "disabled_rules": [],
+        "docker_socket_paths": [
+          "/var/run/docker.sock",
+          "/run/docker.sock",
+          "/var/run/docker",
+          "/run/containerd/containerd.sock"
+        ],
+        "home_directory_roots": [
+          "/home",
+          "/Users"
+        ],
+        "ignore_containers": [
+          "docker-audit-agent-*"
+        ],
+        "include_stopped_containers": true,
+        "secret_env_name_patterns": [
+          "*PASSWORD*",
+          "*PASSWD*",
+          "*SECRET*",
+          "*TOKEN*",
+          "*API_KEY*",
+          "*APIKEY*",
+          "*PRIVATE_KEY*",
+          "*CREDENTIAL*",
+          "*ACCESS_KEY*"
+        ],
+        "sensitive_home_subpaths": [
+          ".ssh",
+          ".docker",
+          ".aws",
+          ".azure",
+          ".kube",
+          ".gnupg",
+          ".config/gcloud",
+          "Library/Keychains"
+        ],
+        "sensitive_host_paths": [
+          "/",
+          "/etc",
+          "/proc",
+          "/sys",
+          "/dev",
+          "/boot",
+          "/root",
+          "/var/lib/docker",
+          "/var/log",
+          "/lib/modules",
+          "/usr",
+          "/run",
+          "/private/etc"
+        ],
+        "severity_overrides": {},
+        "vulnerability_min_severity": "low"
+      },
+      "sampling": {},
+      "scenario_id": "grficsv3-baseline",
+      "schema_versions": {
+        "assessment_schema_sha256": "209ac6096f37735acd281644e565f70c36011f8b09d9356d4cd86197ecb63c31",
+        "db_schema_version": 5,
+        "report_version": "2.0"
+      }
+    },
+    "framework": {
+      "commit": "2e50660c65cce99cde4bc9baede7b9d56ca2fc71",
+      "dirty": true,
+      "package_version": "0.1.0"
+    },
+    "manifest_version": "2",
+    "run_id": "run-20261110-042501-9459"
+  },
+  "manifest_sha256": "dfe85557a4b7fe15e81a2e04b827e96b67ec59c9d2d2caae892c9a4042bd882e"
+}

@@ -2,7 +2,7 @@
 
 Integration tests launch this script as a real MCP subprocess, exactly like
 the application launches the real servers, so the whole client path
-(SDK MCPServerStdio -> GuardedMCPServer -> policy/redaction/shaping) is
+(SDK MCPServerStdio -> GuardedMCPServer -> policy/shaping) is
 exercised without Docker, Trivy or network access.
 
     python fake_mcp_server.py docker   # docker-mcp-server look-alike

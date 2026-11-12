@@ -1,0 +1,907 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261103-225702-e4b9",
+  "generated_at": "2026-11-03T23:18:42.626044Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.3,
+      "max_tokens": 8192,
+      "timeout_seconds": 360.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "agent_status": "ok",
+  "snapshot_id": "snap-17690ac30597eb8d",
+  "scores": {
+    "deterministic_total": 85,
+    "found": 29,
+    "missed": 56,
+    "recall": 0.341,
+    "weighted_recall": 0.455,
+    "by_severity": [
+      {
+        "severity": "critical",
+        "total": 7,
+        "found": 5
+      },
+      {
+        "severity": "high",
+        "total": 1,
+        "found": 0
+      },
+      {
+        "severity": "medium",
+        "total": 25,
+        "found": 12
+      },
+      {
+        "severity": "low",
+        "total": 42,
+        "found": 12
+      },
+      {
+        "severity": "info",
+        "total": 10,
+        "found": 0
+      }
+    ],
+    "agent_total": 29,
+    "agent_matched": 25,
+    "agent_unmatched": 0,
+    "agent_rejected": 4,
+    "match_rate": 0.862,
+    "rejection_rate": 0.138
+  },
+  "found": [
+    {
+      "deterministic": {
+        "finding_id": "F-V001-ec328b84bb",
+        "rule_id": "V001",
+        "title": "Image has known vulnerabilities (85 CRITICAL, 1319 HIGH, 2796 MEDIUM, 1247 LOW, 187 UNKNOWN)",
+        "resource_name": "fortiphyd/grfics-caldera:latest",
+        "severity": "critical"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-94cfa11769"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "same"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-V001-c66c18dcb1",
+        "rule_id": "V001",
+        "title": "Image has known vulnerabilities (5 CRITICAL, 190 HIGH, 354 MEDIUM, 247 LOW, 2 UNKNOWN)",
+        "resource_name": "fortiphyd/grfics-router:latest",
+        "severity": "critical"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-8e162ad996"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "same"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-V001-885cc6c80e",
+        "rule_id": "V001",
+        "title": "Image has known vulnerabilities (47 CRITICAL, 92 HIGH, 146 MEDIUM, 55 LOW)",
+        "resource_name": "fortiphyd/grfics-scadalts:latest",
+        "severity": "critical"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-317afdd2d3"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "same"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-V001-e3f7e95629",
+        "rule_id": "V001",
+        "title": "Image has known vulnerabilities (7 CRITICAL, 157 HIGH, 246 MEDIUM, 278 LOW, 8 UNKNOWN)",
+        "resource_name": "fortiphyd/grfics-simulation:latest",
+        "severity": "critical"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-bf3ee86cc9"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "same"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C008-2f79b25a20",
+        "rule_id": "C008",
+        "title": "Docker socket is mounted into the container",
+        "resource_name": "simulation",
+        "severity": "critical"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-64c9b49ecd"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "same"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C002-280907e1cf",
+        "rule_id": "C002",
+        "title": "Container adds dangerous capabilities: NET_ADMIN",
+        "resource_name": "EWS",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-18a40307cb"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C003-88cc9d0bc0",
+        "rule_id": "C003",
+        "title": "Container runs as root",
+        "resource_name": "EWS",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-2cda102cd8"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C002-a1ba480fb4",
+        "rule_id": "C002",
+        "title": "Container adds dangerous capabilities: NET_ADMIN",
+        "resource_name": "HMI",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-b0a282b9d9"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C003-9407175968",
+        "rule_id": "C003",
+        "title": "Container runs as root",
+        "resource_name": "HMI",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-01a6c3ac51"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C003-f7d0b56613",
+        "rule_id": "C003",
+        "title": "Container runs as root",
+        "resource_name": "caldera",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-e51514926e"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C002-a1aae85cf0",
+        "rule_id": "C002",
+        "title": "Container adds dangerous capabilities: NET_ADMIN",
+        "resource_name": "kali",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-fb22dc96a2"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C003-92c35facbb",
+        "rule_id": "C003",
+        "title": "Container runs as root",
+        "resource_name": "kali",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-875a0eb5ad"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C002-97d5596d2e",
+        "rule_id": "C002",
+        "title": "Container adds dangerous capabilities: NET_ADMIN",
+        "resource_name": "plc",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-8eb56f9fdf"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C003-94d7492a2c",
+        "rule_id": "C003",
+        "title": "Container runs as root",
+        "resource_name": "plc",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-3766c3fa93"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C002-2772fcc25a",
+        "rule_id": "C002",
+        "title": "Container adds dangerous capabilities: NET_ADMIN, NET_RAW",
+        "resource_name": "router",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-4ba3fea9a8"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C002-7c9f73aaae",
+        "rule_id": "C002",
+        "title": "Container adds dangerous capabilities: NET_ADMIN",
+        "resource_name": "simulation",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-27ce9af58c"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-C003-97b777a16e",
+        "rule_id": "C003",
+        "title": "Container runs as root",
+        "resource_name": "simulation",
+        "severity": "medium"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-652b63be13"
+      ],
+      "agent_severity": "high",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-54c3b2fc90",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "EWS",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-622ea665f5"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-N001-8ab0cd85d2",
+        "rule_id": "N001",
+        "title": "Ports published on all host interfaces",
+        "resource_name": "HMI",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-317afdd2d3"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-63864980c1",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "HMI",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-621d9a03e1"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-N001-833f80fdf7",
+        "rule_id": "N001",
+        "title": "Ports published on all host interfaces",
+        "resource_name": "caldera",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-94cfa11769"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-e965bf1bdd",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "caldera",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-7af47036d6"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-N001-252b716e7e",
+        "rule_id": "N001",
+        "title": "Ports published on all host interfaces",
+        "resource_name": "kali",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-8358ccfce1"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-546137a6d3",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "kali",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-e4f6817362"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-3698e224ed",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "plc",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-b8dd4700f5"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-N001-71d2355e79",
+        "rule_id": "N001",
+        "title": "Ports published on all host interfaces",
+        "resource_name": "router",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-8e162ad996"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-35da412774",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "router",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-77817704e1"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-N001-975b03c1da",
+        "rule_id": "N001",
+        "title": "Ports published on all host interfaces",
+        "resource_name": "simulation",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-bf3ee86cc9"
+      ],
+      "agent_severity": "critical",
+      "severity_agreement": "higher"
+    },
+    {
+      "deterministic": {
+        "finding_id": "F-R001-744b8e2751",
+        "rule_id": "R001",
+        "title": "Missing resource limits: memory, cpu, pids",
+        "resource_name": "simulation",
+        "severity": "low"
+      },
+      "agent_finding_ids": [
+        "F-AGENT-ff798e191b"
+      ],
+      "agent_severity": "medium",
+      "severity_agreement": "higher"
+    }
+  ],
+  "missed": [
+    {
+      "finding_id": "F-V001-5c7f29bdf3",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (55 CRITICAL, 1544 HIGH, 6197 MEDIUM, 2083 LOW, 121 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-9e8f54fed8",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (36 CRITICAL, 704 HIGH, 2175 MEDIUM, 1218 LOW, 8 UNKNOWN)",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-V001-2b857d3575",
+      "rule_id": "V001",
+      "title": "Image has known vulnerabilities (6 HIGH, 10 MEDIUM, 13 LOW)",
+      "resource_name": "tecnativa/docker-socket-proxy:v0.5.0",
+      "severity": "high"
+    },
+    {
+      "finding_id": "F-C003-30b0663436",
+      "rule_id": "C003",
+      "title": "Container runs as root",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N003-d193a2a313",
+      "rule_id": "N003",
+      "title": "IP forwarding enabled inside the container",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-964ce77801",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-4281f12603",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: VNC_PASSWORD",
+      "resource_name": "EWS",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-0b7cfb45e1",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-02d0245b2f",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: MYSQL_PASSWORD, MYSQL_ROOT_PASSWORD, TOMCAT_PASSWORD",
+      "resource_name": "HMI",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-be42172b33",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "caldera",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-a795e15932",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-3d55983e0c",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: VNC_PASSWORD",
+      "resource_name": "kali",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-2f42fda941",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "plc",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-81e8c08941",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-S001-9dccac986d",
+      "rule_id": "S001",
+      "title": "Credential-like environment variables: FWUI_SECRET_KEY",
+      "resource_name": "router",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-N002-21d0f049ef",
+      "rule_id": "N002",
+      "title": "Container bridges multiple networks",
+      "resource_name": "simulation",
+      "severity": "medium"
+    },
+    {
+      "finding_id": "F-C006-8f41cb1277",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-5d82bab299",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-cf817cd692",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-50f2144e4b",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-eca6c595cf",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-3f2f6a90de",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-e2ffa58d2c",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-8c6d0e8428",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-attacker:latest",
+      "resource_name": "fortiphyd/grfics-attacker:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-4caef92d21",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-caldera:latest",
+      "resource_name": "fortiphyd/grfics-caldera:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-bdb1b41685",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-plc:latest",
+      "resource_name": "fortiphyd/grfics-plc:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-88b5ab583a",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-router:latest",
+      "resource_name": "fortiphyd/grfics-router:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-bb96196ac9",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-scadalts:latest",
+      "resource_name": "fortiphyd/grfics-scadalts:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-7eb90dfea9",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-simulation:latest",
+      "resource_name": "fortiphyd/grfics-simulation:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-I001-21a668129f",
+      "rule_id": "I001",
+      "title": "Image uses a floating tag: fortiphyd/grfics-workstation:latest",
+      "resource_name": "fortiphyd/grfics-workstation:latest",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-eb3cca5285",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-7f26343bcd",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-1a24118819",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-c26e33faf2",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-N001-a907a359ef",
+      "rule_id": "N001",
+      "title": "Ports published on all host interfaces",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-9b6611f8f4",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-44512c52da",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C006-18bee3c9d8",
+      "rule_id": "C006",
+      "title": "no-new-privileges is not set",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C007-4c9222ff87",
+      "rule_id": "C007",
+      "title": "Root filesystem is writable",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-593bf7be53",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "EWS",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-11cce86996",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "HMI",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-879c799c68",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "caldera",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-abc0e2a83c",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "kali",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-e1b81732ee",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "plc",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-731b4c381b",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "router",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-C010-a9e711ed80",
+      "rule_id": "C010",
+      "title": "No capabilities are dropped",
+      "resource_name": "simulation",
+      "severity": "low"
+    },
+    {
+      "finding_id": "F-R002-ef00ba556b",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "EWS",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-787e7b0bfd",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "HMI",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-39eae3dfcd",
+      "rule_id": "N005",
+      "title": "Network 'docker-audit-agent_default' is not internal (has external egress)",
+      "resource_name": "docker-audit-agent_default",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-bb9759638d",
+      "rule_id": "N005",
+      "title": "Network 'docker-audit-proxy_default' is not internal (has external egress)",
+      "resource_name": "docker-audit-proxy_default",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-847d1eb8ad",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_a-grfics-admin' is not internal (has external egress)",
+      "resource_name": "grficsv3_a-grfics-admin",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-03974092ac",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_b-ics-net' is not internal (has external egress)",
+      "resource_name": "grficsv3_b-ics-net",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-N005-b92597b3c2",
+      "rule_id": "N005",
+      "title": "Network 'grficsv3_c-dmz-net' is not internal (has external egress)",
+      "resource_name": "grficsv3_c-dmz-net",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-bba4932b61",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "kali",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-398ce635fd",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "plc",
+      "severity": "info"
+    },
+    {
+      "finding_id": "F-R002-098663dfc9",
+      "rule_id": "R002",
+      "title": "No restart policy",
+      "resource_name": "simulation",
+      "severity": "info"
+    }
+  ],
+  "agent_unmatched": [],
+  "agent_rejected": [
+    {
+      "finding_id": "F-AGENT-694a5642de",
+      "rule_id": "AGENT",
+      "title": "Exposed VNC Service with Vulnerable Image",
+      "resource_name": "EWS",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-AGENT-fa8f407984",
+      "rule_id": "AGENT",
+      "title": "Exposed PLC Web Interface with Vulnerable Image",
+      "resource_name": "plc",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-AGENT-82e573114c",
+      "rule_id": "AGENT",
+      "title": "ICS Network Bridging to DMZ",
+      "resource_name": "grficsv3_c-dmz-net",
+      "severity": "critical"
+    },
+    {
+      "finding_id": "F-AGENT-29e096932b",
+      "rule_id": "AGENT",
+      "title": "Attacker Tools in DMZ Network",
+      "resource_name": "grficsv3_c-dmz-net",
+      "severity": "high"
+    }
+  ],
+  "agent_out_of_scope": [],
+  "method": [
+    "The agent never saw the deterministic findings; they are used here as the answer key.",
+    "An agent finding covers a deterministic finding when it names the same resource (for image findings, also a container running that image) and cites the same Docker field as the rule's evidence (prefix match, list indexes ignored, equivalent fields accepted).",
+    "Image vulnerabilities (V001) are scored per image: covered when the agent reported at least one vulnerability ID that Trivy found in that image.",
+    "Where two rules use the same field, the agent's wording decides (e.g. 'docker.sock' -> socket mount C008, otherwise sensitive bind mount C009).",
+    "Only validated agent findings can cover a deterministic finding; rejected ones never do.",
+    "Weighted recall weights findings by severity: critical 4, high 3, medium 2, low 1, info 0."
+  ]
+}

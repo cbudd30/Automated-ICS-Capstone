@@ -143,7 +143,7 @@ def test_parse_num_ctx():
 
 VALID = (
     '{"executive_summary":"s","overall_risk":"high","findings":[],'
-    '"recommendations":["r"],"limitations":[]}'
+    '"limitations":[]}'
 )
 
 

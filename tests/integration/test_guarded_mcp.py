@@ -1,8 +1,8 @@
 """GuardedMCPServer against a real MCP subprocess (the fake docker/trivy servers).
 
 These tests prove the security properties end-to-end over the real MCP
-protocol: hidden tools, call-time refusal, redaction before data leaves the
-wrapper, and inventory collection.
+protocol: hidden tools, call-time refusal, unredacted results (harness h3), and
+inventory collection.
 """
 
 import json
@@ -12,7 +12,6 @@ import pytest
 from docker_security_agent.inventory.collector import collect_snapshot
 from docker_security_agent.mcp.policy import ToolPolicy
 from docker_security_agent.mcp.recorder import ToolCallRecorder
-from docker_security_agent.mcp.redaction import Redactor
 from docker_security_agent.mcp.registry import build_servers, connect, inspect_server_tools
 from docker_security_agent.security.scanner import scan_images
 
@@ -22,7 +21,7 @@ pytestmark = pytest.mark.integration
 def _servers(settings, max_calls=40):
     recorder = ToolCallRecorder(max_calls)
     policy = ToolPolicy(settings.mcp)
-    servers = build_servers(settings, policy, Redactor(settings.mcp.redaction), recorder)
+    servers = build_servers(settings, policy, recorder)
     return servers, policy, recorder
 
 
@@ -57,12 +56,13 @@ async def test_dangerous_tools_are_hidden_and_refused(fake_mcp_settings, tmp_pat
     assert recorder.blocked() == 2
 
 
-async def test_agent_results_are_redacted_and_shaped(fake_mcp_settings):
+async def test_agent_results_are_unredacted_and_shaped(fake_mcp_settings):
     servers, _, _ = _servers(fake_mcp_settings)
     async with connect(servers) as manager:
         docker = next(s for s in manager.active_servers if s.name == "docker")
         hmi = (await docker.call_tool("container_inspect", {"id_or_name": "HMI"})).content[0].text
-        assert "Sup3rS3cret!" not in hmi and "MYSQL_ROOT_PASSWORD=<redacted>" in hmi
+        # h3: credentials reach the agent as-is (finding them is part of the lab)
+        assert "MYSQL_ROOT_PASSWORD=Sup3rS3cret!" in hmi and "<redacted>" not in hmi
         listing = (await docker.call_tool("container_list", {"all": True})).content[0].text
         assert "ResolvConfPath" not in listing  # compacted summary, not raw inspect docs
         assert '"name":"simulation"' in listing
@@ -75,8 +75,7 @@ async def test_collect_snapshot_over_mcp(fake_mcp_settings):
         snap = await collect_snapshot(docker)
     assert {c.name for c in snap.containers} >= {"simulation", "router", "plc", "hardened"}
     assert snap.docker_version == "29.7.2"
-    assert snap.redactions >= 4
-    assert "Sup3rS3cret!" not in snap.model_dump_json()
+    assert "Sup3rS3cret!" in snap.model_dump_json()  # h3: stored unredacted
     assert all(r.phase == "collector" and r.status == "ok" for r in recorder.records)
 
 

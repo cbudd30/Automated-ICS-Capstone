@@ -1,24 +1,30 @@
 # ---------------------------------------------------------------------------
 # Containerized Docker Security Assessment Agent (docker-audit).
 #
-# The agent is a CLI, so it runs as one-shot containers:
+# The agent is a CLI, so it runs as one-shot containers. Use the wrapper, which
+# also copies each run's reports and databases back to the Mac:
 #
-#   docker compose -f deploy/socket-proxy/compose.yml up -d     # proxy first
 #   deploy/agent/build.sh                  # = compose build, + git provenance
-#   docker compose -f deploy/agent/compose.yml run --rm agent setup      # once: Trivy DB
-#   docker compose -f deploy/agent/compose.yml run --rm agent doctor     # preflight
-#   docker compose -f deploy/agent/compose.yml run --rm agent assess --model local-qwen
-#   docker compose -f deploy/agent/compose.yml run --rm test             # pytest in Docker
+#   deploy/agent/run.sh setup              # once: Trivy DB
+#   deploy/agent/run.sh doctor             # preflight
+#   deploy/agent/run.sh assess --model local-vllm --range-baseline clean-v2
+#   docker compose -f deploy/agent/compose.yml run --rm test   # pytest in Docker
 #
-# Anything after `agent` is passed to `docker-audit` (ENTRYPOINT). With no
+# Anything after the command is passed to `docker-audit` (ENTRYPOINT). With no
 # arguments the container runs `docker-audit doctor`.
 #
 # How the container reaches its dependencies:
-#   Ollama  -> host.docker.internal:11434 (Ollama stays on the Mac)
-#   Docker  -> tcp://docker-audit-socket-proxy:2375 over the internal
-#              docker-audit-mgmt network (the read-only proxy; no socket here)
+#   vLLM    -> host.docker.internal:8000 (the SSH tunnel to the GPU VM on the Mac)
+#   Docker  -> the Docker socket, FULL access (no read-only proxy since harness h4)
 #   MCP     -> docker-mcp-server and trivy-mcp run as stdio subprocesses
-#              INSIDE this container, exactly as on the host
+#              INSIDE this container, so their reach is this container + Docker
+#
+# Containment (harness h4): this container mounts NO folder from the Mac.
+# Config is baked into the image (rebuild after changing config/), and reports
+# and databases live in the Docker volumes below; run.sh copies them to the Mac
+# with `docker cp`, which does not need Docker Desktop file sharing. Together
+# with file sharing turned off in Docker Desktop, nothing the agent does through
+# Docker can reach the Mac's files.
 #
 # Every host-specific value is an environment variable with a default; set
 # them in your shell or pass `--env-file`. They are named AGENT_* so they never
@@ -47,23 +53,27 @@ x-agent: &agent
   environment:
     OLLAMA_BASE_URL: ${AGENT_OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
     VLLM_BASE_URL: ${AGENT_VLLM_BASE_URL:-http://host.docker.internal:8000/v1}
-    DOCKER_AUDIT_DOCKER_HOST: ${AGENT_DOCKER_HOST:-tcp://docker-audit-socket-proxy:2375}
+    DOCKER_AUDIT_DOCKER_HOST: unix:///var/run/docker.sock
     DOCKER_AUDIT_CONFIG_DIR: /app/config
   extra_hosts:
     # Docker Desktop already resolves host.docker.internal; this also makes it
     # work on Linux engines.
     - "host.docker.internal:host-gateway"
   volumes:
-    # Same config, SQLite databases and reports as the host workflow, so runs
-    # from either side appear in `docker-audit runs`.
-    - ${AGENT_CONFIG_DIR:-../../config}:/app/config:ro
-    - ${AGENT_DATA_DIR:-../../data}:/app/data
-    - ${AGENT_OUTPUT_DIR:-../../outputs}:/app/outputs
+    # The Docker socket inside Docker Desktop's VM (not a Mac folder): full
+    # Docker access for the MCP servers.
+    - /var/run/docker.sock:/var/run/docker.sock
+    # Docker-only storage, never Mac folders (run.sh copies results out).
+    - agent-data:/app/data
+    - agent-outputs:/app/outputs
     # Trivy vulnerability DB + layer cache (filled by `setup`).
     - trivy-cache:/home/agent/.cache/trivy
   # Hardening: non-root (uid 10001, set in the image), no Linux capabilities,
-  # no privilege escalation, no Docker socket. init reaps the MCP subprocesses.
+  # no privilege escalation. Group 0 only to open the Docker socket.
+  # init reaps the MCP subprocesses.
   user: "10001:10001"
+  group_add:
+    - "0"
   cap_drop: [ALL]
   security_opt:
     - no-new-privileges:true
@@ -76,8 +86,7 @@ services:
   agent:
     <<: *agent
     networks:
-      - default            # egress: Ollama on the host, Trivy DB download, OpenAI
-      - docker-audit-mgmt  # the read-only Docker API proxy only
+      - default            # egress: vLLM tunnel on the Mac, Trivy DB download
 
   # The automated test suite, inside the image (dev dependencies + tests).
   # No network at all: the tests use fakes, not Docker or an LLM.
@@ -100,10 +109,7 @@ services:
     tmpfs:
       - /tmp:exec
 
-networks:
-  # Created by deploy/socket-proxy/compose.yml (internal: no outside route).
-  docker-audit-mgmt:
-    external: true
-
 volumes:
+  agent-data:
+  agent-outputs:
   trivy-cache:

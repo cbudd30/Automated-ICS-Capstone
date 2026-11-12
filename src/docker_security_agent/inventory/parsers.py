@@ -1,4 +1,4 @@
-"""Parse raw (already redacted) Docker API documents into typed assets.
+"""Parse raw Docker API documents into typed assets.
 
 Each ``parse_*`` function takes one JSON document exactly as docker-mcp-server
 returns it (which is the Docker Engine API's inspect format) and returns the

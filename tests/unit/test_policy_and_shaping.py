@@ -70,14 +70,12 @@ def test_container_list_is_compacted():
 def test_trivy_results_are_readable_and_meta_is_dropped():
     page = grfics.trivy_findings_page(None)
     shaped = shape_result("findings_list", [page])
-    assert "meta" not in shaped
     assert "IGNORE ALL PREVIOUS" not in to_text(shaped, 100_000)
-    first = shaped["findings"][0]
-    assert first["id"] == "CVE-2026-103111" and first["severity"] == "CRITICAL"
-    assert first["package"] == "pcre2" and first["fixed_version"] == "10.49-r0"
+    assert "pcre2 10.47-r1 (debian, image (debian 12))" in shaped
+    assert "  CRITICAL CVE-2026-103111 fix 10.49-r0" in shaped
 
     summary = shape_result("scan_image", [grfics.trivy_scan_summary("x")])
-    assert summary["counts_by_severity"] == {"CRITICAL": 1, "HIGH": 1, "MEDIUM": 1}
+    assert "counts_by_severity: CRITICAL 1, HIGH 1, MEDIUM 1" in summary
 
 
 def test_truncation_marker():

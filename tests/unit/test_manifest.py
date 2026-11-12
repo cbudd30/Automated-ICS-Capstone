@@ -11,7 +11,6 @@ from docker_security_agent.manifest import (
     parse_manifest_document,
     write_manifest,
 )
-from docker_security_agent.memory.repository import AssessmentRepository
 from docker_security_agent.schemas.reports import DockerEndpointInfo
 
 
@@ -32,9 +31,7 @@ def _manifest(settings, run_id="run-1", **overrides):
 
 
 def test_config_hash_covers_experiment_not_run_identity_or_acquisition(settings):
-    endpoint = DockerEndpointInfo(
-        docker_host="tcp://127.0.0.1:2375", require_proxy=True, proxy_verified=True
-    )
+    endpoint = DockerEndpointInfo(docker_host="unix:///var/run/docker.sock")
     a = _manifest(settings)
     b = _manifest(settings, run_id="run-2", mode="live", docker_endpoint=endpoint)
     assert a.experiment.evidence.scan_ids == [1, 2, 3]
@@ -64,14 +61,6 @@ def test_manifest_file_is_write_once_and_tamper_evident(settings, tmp_path):
         parse_manifest_document(json.dumps(doc))
     with pytest.raises(ConfigError, match="not a valid run manifest"):
         parse_manifest_document("{}")
-
-
-def test_load_scans_by_id_requires_every_scan(tmp_path):
-    repo = AssessmentRepository(tmp_path / "a.db")
-    with pytest.raises(KeyError):
-        repo.load_scans([42])
-    assert repo.load_scans([]) == []
-    repo.close()
 
 
 def test_framework_info_falls_back_to_image_build_provenance(tmp_path, monkeypatch):

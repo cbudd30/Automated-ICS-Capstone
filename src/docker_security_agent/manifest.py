@@ -9,18 +9,12 @@ with two hashes:
 * ``config_sha256``   - only the ``experiment`` block: what the run was asked
   to do (scenario, objective, pinned evidence, prompt bundle, schemas, per-role
   models + sampling, limits, rules, logging). Two runs with the same
-  ``config_sha256`` had the same experimental configuration; re-running from a
-  manifest reproduces it.
+  ``config_sha256`` had the same experimental configuration.
 
 Everything outside ``experiment`` describes the run instance (ID, time, code
 commit) or how the evidence was acquired (live MCP servers, Docker endpoint,
 scan settings). Acquisition does not belong in the config hash because the
 deterministic evidence is pinned by ``snapshot_id`` + ``scan_ids``.
-
-Re-running a manifest: a deterministic run is replayed on its pinned evidence
-(no Docker access). An agent run investigates live Docker with MCP tools, so
-it cannot be replayed; it is re-run live with the same configuration, and must
-start from the same range baseline when the original did.
 
 The JSON file is self-verifying: ``{"manifest": {...}, "manifest_sha256": ...}``.
 
@@ -40,7 +34,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from docker_security_agent import PROMPT_VERSION, __version__
+from docker_security_agent import HARNESS_VERSION, PROMPT_VERSION, __version__
 from docker_security_agent.config import ConfigError, ModelProfile, Settings
 from docker_security_agent.memory.database import SCHEMA_VERSION
 from docker_security_agent.schemas.reports import AgentAssessment, DockerEndpointInfo, Report
@@ -92,6 +86,9 @@ class RangeCheck(_Frozen):
 class PromptBundle(_Frozen):
     version: str  # PROMPT_VERSION
     instructions_sha256: str  # the exact agent instructions text
+    # What the harness shows the model and lets it do (defaults = older manifests).
+    harness_version: str = "h1"  # HARNESS_VERSION
+    shaping_version: str = "s1"  # mcp/shaping.py SHAPING_VERSION
 
 
 class SchemaVersions(_Frozen):
@@ -110,6 +107,7 @@ class AgentSettings(_Frozen):
     max_tool_calls: int
     max_duration_seconds: float
     max_tool_result_chars: int
+    keep_recent_tool_outputs: int | None = None  # h2 context filter; None = none (h1)
     named_session: bool  # True = --session was used; earlier conversation may be in context
 
 
@@ -146,25 +144,19 @@ class MCPServerRecord(_Frozen):
 
 
 class Acquisition(_Frozen):
-    mode: Literal["live", "replay", "deterministic"]
+    mode: Literal["live", "deterministic"]
     docker_endpoint: DockerEndpointInfo | None  # None when Docker was not contacted
     range_check: RangeCheck | None  # live runs with --range-baseline only
     mcp_servers: list[MCPServerRecord]
     argument_policy: dict[str, Any]
-    redaction: dict[str, Any]
+    redaction: dict[str, Any] = {}  # legacy: redaction was removed (harness h3)
     scan: dict[str, Any]
-
-
-class ReplayOf(_Frozen):
-    run_id: str
-    manifest_sha256: str
 
 
 class RunManifest(_Frozen):
     manifest_version: str = MANIFEST_VERSION
     run_id: str
     created_at: datetime
-    replay_of: ReplayOf | None = None
     framework: FrameworkInfo
     experiment: ExperimentBlock
     acquisition: Acquisition
@@ -225,8 +217,14 @@ def framework_info(project_root: Path) -> FrameworkInfo:
 def prompt_bundle() -> PromptBundle:
     # Imported here: the agent module pulls in the Agents SDK.
     from docker_security_agent.agents.security_assessment import INSTRUCTIONS
+    from docker_security_agent.mcp.shaping import SHAPING_VERSION
 
-    return PromptBundle(version=PROMPT_VERSION, instructions_sha256=_text_sha256(INSTRUCTIONS))
+    return PromptBundle(
+        version=PROMPT_VERSION,
+        instructions_sha256=_text_sha256(INSTRUCTIONS),
+        harness_version=HARNESS_VERSION,
+        shaping_version=SHAPING_VERSION,
+    )
 
 
 def schema_versions() -> SchemaVersions:
@@ -246,14 +244,13 @@ def build_manifest(
     *,
     settings: Settings,
     run_id: str,
-    mode: Literal["live", "replay", "deterministic"],
+    mode: Literal["live", "deterministic"],
     objective: str,
     profile: ModelProfile | None,
     named_session: bool,
     snapshot_id: str,
     scan_ids: list[int],
     docker_endpoint: DockerEndpointInfo | None,
-    replay_of: ReplayOf | None = None,
     range_baseline: RangeRef | None = None,
     range_check: RangeCheck | None = None,
 ) -> RunManifest:
@@ -271,7 +268,6 @@ def build_manifest(
     return RunManifest(
         run_id=run_id,
         created_at=datetime.now(UTC),
-        replay_of=replay_of,
         framework=framework_info(settings.project_root),
         experiment=ExperimentBlock(
             scenario_id=settings.experiment.scenario_id,
@@ -309,7 +305,6 @@ def build_manifest(
             if live
             else [],
             argument_policy=settings.mcp.argument_policy.model_dump(mode="json") if live else {},
-            redaction=settings.mcp.redaction.model_dump(mode="json") if live else {},
             scan=settings.experiment.scan.model_dump(mode="json") if live else {},
         ),
     )
@@ -360,63 +355,3 @@ def parse_manifest_document(text: str, source: str = "manifest") -> RunManifest:
             f"actual {actual[:12]}): the manifest was modified after the run."
         )
     return manifest
-
-
-# ---------------------------------------------------------------------------
-# Re-running
-# ---------------------------------------------------------------------------
-
-
-def drift(manifest: RunManifest, project_root: Path) -> tuple[list[str], list[str]]:
-    """Differences between the manifest and the code running now.
-
-    Returns (blocking, informational). Blocking drift means the same config
-    cannot be reproduced: the prompt or an output schema changed.
-    """
-    exp = manifest.experiment
-    blocking = []
-    if exp.prompt_bundle != prompt_bundle():
-        blocking.append(
-            f"prompt bundle changed ({exp.prompt_bundle.version} -> {PROMPT_VERSION}, "
-            "or the instructions text differs)"
-        )
-    if exp.schema_versions != schema_versions():
-        blocking.append("report / database / agent-output schema changed")
-    info = []
-    now = framework_info(project_root)
-    if now.commit != manifest.framework.commit:
-        info.append(
-            f"framework commit differs: manifest {manifest.framework.commit[:12]}, "
-            f"now {now.commit[:12]}"
-        )
-    if manifest.framework.dirty:
-        info.append("the original run used uncommitted code changes")
-    return blocking, info
-
-
-def apply_manifest(settings: Settings, manifest: RunManifest) -> tuple[Settings, str | None]:
-    """Settings reconfigured to match the manifest's experiment block.
-
-    Returns (settings, model profile name or None for a deterministic re-run).
-    """
-    exp = manifest.experiment
-    settings = settings.model_copy(deep=True)
-    settings.experiment.scenario_id = exp.scenario_id
-    settings.experiment.objective = exp.objective
-    settings.rules = type(settings.rules).model_validate(exp.rules)
-    settings.agent.tracing_enabled = exp.logging.tracing_enabled
-    if exp.agent is not None:
-        a = exp.agent
-        settings.agent.limits = type(settings.agent.limits)(
-            max_turns=a.max_turns,
-            max_tool_calls=a.max_tool_calls,
-            max_duration_seconds=a.max_duration_seconds,
-            max_tool_result_chars=a.max_tool_result_chars,
-        )
-    profile_name = None
-    if ASSESSOR_ROLE in exp.models:
-        profile = ModelProfile.model_validate(exp.models[ASSESSOR_ROLE])
-        # Same name as the original; replaces any local profile of that name.
-        settings.models[profile.name] = profile
-        profile_name = profile.name
-    return settings, profile_name

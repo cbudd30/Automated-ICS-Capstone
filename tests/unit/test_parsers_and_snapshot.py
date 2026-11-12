@@ -79,7 +79,9 @@ def test_snapshot_id_is_stable_and_ignores_volatile_fields(settings, monkeypatch
     assert build_snapshot(settings).snapshot_id != a.snapshot_id
 
 
-def test_secret_values_never_reach_the_snapshot(snapshot):
+def test_credential_values_are_kept_in_the_snapshot(snapshot):
+    """Harness h3: no redaction. Finding credentials is part of the lab, so the raw
+    inspect documents keep environment values and labels exactly as Docker returns them."""
     dumped = snapshot.model_dump_json()
     for secret in (
         "Sup3rS3cret!",
@@ -87,7 +89,8 @@ def test_secret_values_never_reach_the_snapshot(snapshot):
         "hunter2",
         "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
     ):
-        assert secret not in dumped
+        assert secret in dumped
+    assert "<redacted>" not in dumped
 
 
 def test_mount_and_port_order_does_not_change_snapshot_id(settings, monkeypatch):

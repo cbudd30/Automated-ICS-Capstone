@@ -16,12 +16,10 @@ severity_overrides: {}
 # Analyse stopped containers too (they can be started again at any time).
 include_stopped_containers: true
 
-# Containers whose name matches any of these globs are ignored. The audit's own
-# socket proxy is excluded: it mounts the Docker socket by design. So is the
+# Containers whose name matches any of these globs are ignored: the
 # containerized agent itself (deploy/agent/compose.yml), whose containers are
 # named docker-audit-agent-agent-1 / docker-audit-agent-agent-run-<id>.
 ignore_containers:
-  - docker-audit-socket-proxy
   - docker-audit-agent-*
 
 # Linux capabilities that materially weaken isolation, with the severity used

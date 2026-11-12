@@ -81,8 +81,14 @@ profiles:
     model: "${VLLM_MODEL:-Qwen/Qwen3-14B}"
     base_url: "${VLLM_BASE_URL:-http://localhost:8000/v1}"
     api_key_env: VLLM_API_KEY
-    temperature: 0.2
-    timeout_seconds: 600
+    # 0.2 let Qwen3-32B get stuck repeating its reasoning (one turn ran ~16k
+    # tokens until the timeout); 0.6 (Qwen's recommendation) wandered and invented
+    # container names in its one run. 0.3 is the compromise under test.
+    temperature: 0.3
+    # Ends a runaway turn after ~5 min at ~27 tokens/s; normal turns stay well below.
+    max_tokens: 8192
+    # Room for one capped turn (8192 tokens ~ 5 min) before the request is retried.
+    timeout_seconds: 360
     max_retries: 1
     structured_output: prompted
     description: >-

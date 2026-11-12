@@ -2,8 +2,7 @@
 
 Responsibilities:
 
-* ``check_docker_endpoint`` - make sure ``docker_host`` is the read-only proxy
-  (not the raw socket) and that the proxy actually filters requests.
+* ``check_docker_endpoint`` - make sure Docker answers at ``docker_host``.
 * ``ensure_server_setup``   - install the trivy-mcp plugin on demand (the
   "dynamic install" for servers that are not Python packages; docker-mcp-server
   needs nothing because ``uvx`` fetches the pinned version itself).
@@ -32,20 +31,17 @@ from agents.mcp import MCPServerManager
 from docker_security_agent.config import MCPServerConfig, Settings
 from docker_security_agent.mcp.policy import ToolPolicy
 from docker_security_agent.mcp.recorder import ToolCallRecorder
-from docker_security_agent.mcp.redaction import Redactor
 from docker_security_agent.mcp.servers import GuardedMCPServer
 
 # ---------------------------------------------------------------------------
-# Docker endpoint / proxy checks
+# Docker endpoint check
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class DockerEndpointStatus:
     docker_host: str
-    is_tcp: bool
     reachable: bool = False
-    filtered: bool = False  # True = proxy refused a request it should refuse
     docker_version: str = ""
     problems: list[str] = field(default_factory=list)
 
@@ -54,52 +50,37 @@ class DockerEndpointStatus:
         return not self.problems
 
 
-def _http_base(docker_host: str) -> str:
-    """tcp://127.0.0.1:2375 -> http://127.0.0.1:2375"""
-    parsed = urlparse(docker_host)
-    return f"http://{parsed.hostname}:{parsed.port or 2375}"
-
-
 def check_docker_endpoint(settings: Settings, timeout: float = 5.0) -> DockerEndpointStatus:
-    """Verify that the configured Docker endpoint is the read-only proxy.
+    """Ask Docker for its version at ``docker_host`` (unix:// socket or tcp://).
 
-    The filtering test is harmless: it sends ``GET /secrets``. Through the
-    proxy (SECRETS=0) the answer is HTTP 403. A raw Docker daemon would answer
-    503/200 instead. We never send a POST to find out - on a raw socket a
-    POST could actually change something.
+    The agent's tools have full Docker access (there is no read-only proxy
+    since 2026-11-09); what keeps them inside Docker is that Docker Desktop
+    shares no Mac folders and that the agent itself runs in a container
+    (deploy/agent). See docs/running-the-agent.md.
     """
     host = settings.mcp.docker_host
-    status = DockerEndpointStatus(docker_host=host, is_tcp=host.startswith("tcp://"))
-
-    if not status.is_tcp:
-        if settings.mcp.require_proxy:
-            status.problems.append(
-                f"docker_host '{host}' is not a tcp:// proxy address. Start the read-only "
-                "proxy (deploy/socket-proxy/compose.yml) and point docker_host at it, or set "
-                "require_proxy: false (NOT recommended)."
-            )
+    status = DockerEndpointStatus(docker_host=host)
+    parsed = urlparse(host)
+    if parsed.scheme == "unix":
+        transport, base = httpx.HTTPTransport(uds=parsed.path), "http://docker"
+    elif parsed.scheme == "tcp":
+        transport, base = None, f"http://{parsed.hostname}:{parsed.port or 2375}"
+    else:
+        status.problems.append(f"docker_host '{host}' must start with unix:// or tcp://")
         return status
-
-    base = _http_base(host)
     try:
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(transport=transport, timeout=timeout) as client:
             version = client.get(f"{base}/version")
-            status.reachable = version.status_code == 200
-            if status.reachable:
-                status.docker_version = version.json().get("Version", "")
-            probe = client.get(f"{base}/secrets")
-            status.filtered = probe.status_code == 403
     except httpx.HTTPError as exc:
-        status.problems.append(f"Cannot reach Docker proxy at {base}: {exc}")
-        return status
-
-    if not status.reachable:
-        status.problems.append(f"Docker proxy at {base} did not answer /version with 200.")
-    if not status.filtered and settings.mcp.require_proxy:
         status.problems.append(
-            f"{base} did not refuse GET /secrets with 403, so it does not look like the "
-            "read-only socket proxy. Refusing to continue (require_proxy: true)."
+            f"Cannot reach Docker at {host}: {exc}. Is Docker Desktop running?"
         )
+        return status
+    status.reachable = version.status_code == 200
+    if status.reachable:
+        status.docker_version = version.json().get("Version", "")
+    else:
+        status.problems.append(f"Docker at {host} answered /version with {version.status_code}")
     return status
 
 
@@ -191,7 +172,6 @@ def download_trivy_db() -> tuple[bool, str]:
 def build_servers(
     settings: Settings,
     policy: ToolPolicy,
-    redactor: Redactor,
     recorder: ToolCallRecorder,
     roles: set[str] | None = None,
 ) -> list[GuardedMCPServer]:
@@ -205,7 +185,6 @@ def build_servers(
                 cfg,
                 docker_host=settings.mcp.docker_host,
                 policy=policy,
-                redactor=redactor,
                 recorder=recorder,
                 max_result_chars=settings.agent.limits.max_tool_result_chars,
             )

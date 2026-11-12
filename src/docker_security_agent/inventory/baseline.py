@@ -2,9 +2,8 @@
 
 The reference framework requires the range to be reset to a known snapshot
 before every experimental run. The reset itself changes Docker state, so it is
-NOT done by this application (which only ever reads Docker through the
-read-only proxy): ``deploy/grfics/range.sh`` performs it with the operator's
-own Docker access. This module provides the read-only half:
+NOT done by this application: ``deploy/grfics/range.sh`` performs it with the
+operator's own Docker access. This module provides the read-only half:
 
 * ``record_baseline`` - fingerprint the current inventory under a name
   (``docker-audit range record NAME``).
@@ -25,9 +24,10 @@ labels including compose's config hash, volume set, container state - must match
 created after the reset started. That catches a reset that skipped restoring
 a volume (its old contents - e.g. a modified PLC program - would survive).
 ``project`` limits that check to one compose project (what range.sh resets):
-other resources on the engine, such as the read-only proxy the verification
-itself runs through, legitimately predate the reset. They are still compared
-by the fingerprint.
+other resources on the engine legitimately predate the reset. They are still
+compared by the fingerprint, except the audit's own resources (names starting
+with ``docker-audit-agent``: the agent's container, its networks and volumes),
+which come and go with every containerized run and are left out entirely.
 
 Files live in ``<data_dir>/range-baselines/<NAME>/`` (git-ignored):
 ``baseline.json`` (written once) and ``verifications/<timestamp>.json``.
@@ -52,6 +52,10 @@ _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 # Labels Docker Compose changes on every recreate without any config change.
 VOLATILE_LABELS = {"com.docker.compose.replace"}
 PROJECT_LABEL = "com.docker.compose.project"
+
+# The audit's own resources (the containerized agent, its networks and volumes)
+# are not part of the range: they exist only while a containerized run is going.
+AUDIT_RESOURCE_PREFIX = "docker-audit-agent"
 
 
 class RangeBaseline(BaseModel):
@@ -93,17 +97,29 @@ def fingerprint(snapshot: InventorySnapshot) -> dict[str, Any]:
             "volumes": {"__all__": {"created"}},
         },
     )
-    used = set(snapshot.used_image_ids())
+    used = {
+        c.image_id for c in snapshot.containers if not c.name.startswith(AUDIT_RESOURCE_PREFIX)
+    }
     containers = {}
     for c in data["containers"]:
+        if c["name"].startswith(AUDIT_RESOURCE_PREFIX):
+            continue
         c["labels"] = {k: v for k, v in c["labels"].items() if k not in VOLATILE_LABELS}
         containers[c["name"]] = c
     return {
         "docker": {"version": data["docker_version"], "platform": data["docker_platform"]},
         "containers": containers,
         "images": {i["id"]: i for i in data["images"] if i["id"] in used},
-        "networks": {n["name"]: n for n in data["networks"]},
-        "volumes": {v["name"]: v for v in data["volumes"]},
+        "networks": {
+            n["name"]: n
+            for n in data["networks"]
+            if not n["name"].startswith(AUDIT_RESOURCE_PREFIX)
+        },
+        "volumes": {
+            v["name"]: v
+            for v in data["volumes"]
+            if not v["name"].startswith(AUDIT_RESOURCE_PREFIX)
+        },
     }
 
 

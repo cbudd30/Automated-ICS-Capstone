@@ -15,11 +15,10 @@
 #   range.sh list         list baselines and their latest verified reset
 #
 # THIS SCRIPT CHANGES THE LAB. It is an operator tool and deliberately lives
-# outside docker-audit: the assessment agent and its MCP servers only ever
-# reach Docker through the read-only socket proxy, which refuses every write.
-# This script uses YOUR Docker access instead (DOCKER_HOST is ignored, so it
-# never talks to the proxy). Verification is read-only: it runs
-# `docker-audit range verify`, which inspects the lab through the proxy.
+# outside docker-audit: it uses YOUR Docker access (DOCKER_HOST is ignored).
+# Verification only reads: it runs `docker-audit range verify` on the Mac.
+# The baselines it writes (data/range-baselines/, with the volume archives a
+# reset restores from) stay on the Mac, out of the agent container's reach.
 #
 # What a reset restores: container filesystems (containers are recreated from
 # the same local images; nothing is pulled or built), the contents of every
@@ -117,8 +116,9 @@ cmd_save() {
     log "Archiving volume $vol"
     dkr volume inspect --format '{{range $k, $v := .Labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' "$vol" \
       >"$dir/volumes/$vol.labels"
-    dkr run --rm --network none -v "$vol:/from:ro" -v "$dir/volumes:/to" "$HELPER_IMAGE" \
-      tar -C /from -czf "/to/$vol.tar.gz" .
+    # Streamed out through Docker (stdout): needs no Docker Desktop file sharing.
+    dkr run --rm --network none -v "$vol:/from:ro" "$HELPER_IMAGE" \
+      tar -C /from -czf - . >"$dir/volumes/$vol.tar.gz"
   done < <(project_volumes)
   (cd "$dir/volumes" && shasum -a 256 -- *.tar.gz >SHA256SUMS)
 
@@ -126,7 +126,7 @@ cmd_save() {
   compose start
   wait_healthy
   trap - ERR
-  log "Recording the inventory fingerprint (read-only, via the proxy)"
+  log "Recording the inventory fingerprint (read-only)"
   "${AUDIT[@]}" range record "$name"
 }
 
@@ -158,15 +158,16 @@ cmd_reset() {
     log "Restoring volume $vol"
     # ${args[@]+...}: bash 3.2 (macOS) treats an empty array as unbound under set -u
     dkr volume create ${args[@]+"${args[@]}"} "$vol" >/dev/null
-    dkr run --rm --network none -v "$vol:/to" -v "$dir/volumes:/from:ro" "$HELPER_IMAGE" \
-      tar -C /to -xzf "/from/$vol.tar.gz"
+    # Streamed in through Docker (stdin): needs no Docker Desktop file sharing.
+    dkr run --rm -i --network none -v "$vol:/to" "$HELPER_IMAGE" \
+      tar -C /to -xzf - <"$dir/volumes/$vol.tar.gz"
   done
 
   log "Starting the lab from local images (no pull, no build)"
   compose up -d --no-build --pull never
   wait_healthy
 
-  log "Verifying the range against baseline '$name' (read-only, via the proxy)"
+  log "Verifying the range against baseline '$name' (read-only)"
   "${AUDIT[@]}" range verify "$name" --since "$start" --project "$PROJECT"
 }
 

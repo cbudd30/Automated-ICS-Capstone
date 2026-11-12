@@ -1,0 +1,310 @@
+{
+  "report_version": "2.0",
+  "run_id": "run-20261103-224050-77ce",
+  "generated_at": "2026-11-03T22:49:01.054799Z",
+  "model": {
+    "profile": "local-vllm",
+    "provider": "vllm",
+    "model": "Qwen/Qwen3-32B",
+    "settings": {
+      "name": "local-vllm",
+      "provider": "vllm",
+      "model": "Qwen/Qwen3-32B",
+      "base_url": "http://localhost:8000/v1",
+      "api_key_env": "VLLM_API_KEY",
+      "temperature": 0.6,
+      "max_tokens": 8192,
+      "timeout_seconds": 600.0,
+      "max_retries": 1,
+      "structured_output": "prompted",
+      "min_context_tokens": 16384
+    }
+  },
+  "prompt_version": "v6",
+  "agent_status": "ok",
+  "snapshot_id": "snap-f373af1bdb7c1c22",
+  "executive_summary": "The Docker environment for the ICS lab exhibits severe security risks due to unpatched container images with critical vulnerabilities. Both the 'ics-simulator' and 'opcua-server' containers use images with numerous unfixed flaws in Java libraries, web servers, and system dependencies, which could be exploited to compromise process integrity or availability. Network exposure cannot be fully assessed due to inspection failures, but the presence of high-severity issues in runtime images alone justifies urgent remediation.",
+  "overall_risk": "critical",
+  "findings": [],
+  "rejected": [
+    {
+      "id": "F-AGENT-c0cc97d95b",
+      "rule_id": "AGENT",
+      "title": "High-severity image vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "ics-simulator",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "low",
+      "status": "rejected",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:image_inspect",
+          "resource": "ics-simulator",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-workstation:latest",
+          "note": ""
+        },
+        {
+          "source": "agent:findings_list",
+          "resource": "ics-simulator",
+          "path": "vulnerabilities",
+          "value": "36 critical, 704 high",
+          "note": ""
+        }
+      ],
+      "explanation": "The container's image contains numerous critical and high-severity vulnerabilities, which could be exploited if the container is exposed to untrusted networks. In an ICS context, this risks process integrity and availability.",
+      "remediation": "Update the image to a patched version; consider using a hardened base image for industrial environments.",
+      "references": [
+        "CVE-2022-48887",
+        "CVE-2023-52920",
+        "CVE-2023-53867",
+        "CVE-2023-54019",
+        "CVE-2024-26954",
+        "CVE-2024-35839",
+        "CVE-2024-36013",
+        "CVE-2024-47736",
+        "CVE-2024-50286",
+        "CVE-2024-57893",
+        "CVE-2025-21945",
+        "CVE-2025-21955",
+        "CVE-2025-37777",
+        "CVE-2025-38162",
+        "CVE-2025-40074",
+        "CVE-2025-40347",
+        "CVE-2025-71074",
+        "CVE-2026-23449",
+        "CVE-2026-43049",
+        "CVE-2026-53375",
+        "CVE-2026-63819",
+        "CVE-2026-63825",
+        "CVE-2026-63940",
+        "CVE-2026-64394",
+        "CVE-2026-64557",
+        "CVE-2026-68426",
+        "CVE-2026-72110",
+        "CVE-2026-72338",
+        "CVE-2026-72380",
+        "CVE-2026-72399",
+        "CVE-2026-74345",
+        "CVE-2026-74506",
+        "CVE-2026-74510",
+        "CVE-2026-80837",
+        "CVE-2026-80864",
+        "CVE-2026-80883",
+        "CVE-2026-89530",
+        "CVE-2026-89537",
+        "CVE-2026-89652",
+        "CVE-2026-89659",
+        "CVE-2026-89708",
+        "CVE-2026-90037",
+        "CVE-2026-90104",
+        "CVE-2026-90162",
+        "CVE-2026-90321",
+        "CVE-2026-90392",
+        "CVE-2026-93221",
+        "CVE-2026-93787",
+        "CVE-2026-93796",
+        "CVE-2026-97530",
+        "CVE-2026-98104",
+        "CVE-2026-98107",
+        "CVE-2026-98260",
+        "CVE-2026-98332",
+        "CVE-2026-98365"
+      ],
+      "validation_notes": [
+        "resource 'ics-simulator' not found in the inventory",
+        "cites CVEs Trivy reported for other images, not ics-simulator: CVE-2022-48887, CVE-2023-52920, CVE-2023-53867, CVE-2023-54019, CVE-2024-26954, CVE-2024-35839, CVE-2024-36013, CVE-2024-47736, CVE-2024-50286, CVE-2024-57893, CVE-2025-21945, CVE-2025-21955, CVE-2025-37777, CVE-2025-38162, CVE-2025-40074, CVE-2025-40347, CVE-2025-71074, CVE-2026-23449, CVE-2026-43049, CVE-2026-53375, CVE-2026-63819, CVE-2026-63825, CVE-2026-63940, CVE-2026-64394, CVE-2026-64557, CVE-2026-68426, CVE-2026-72110, CVE-2026-72338, CVE-2026-72380, CVE-2026-72399, CVE-2026-74345, CVE-2026-74506, CVE-2026-74510, CVE-2026-80837, CVE-2026-80864, CVE-2026-80883, CVE-2026-89530, CVE-2026-89537, CVE-2026-89652, CVE-2026-89659, CVE-2026-89708, CVE-2026-90037, CVE-2026-90104, CVE-2026-90162, CVE-2026-90321, CVE-2026-90392, CVE-2026-93221, CVE-2026-93787, CVE-2026-93796, CVE-2026-97530, CVE-2026-98104, CVE-2026-98107, CVE-2026-98260, CVE-2026-98332, CVE-2026-98365",
+        "no verifiable evidence (no matching field or vulnerability ID)",
+        "unverified fields ignored: RepoTags, vulnerabilities"
+      ]
+    },
+    {
+      "id": "F-AGENT-1faf9d986d",
+      "rule_id": "AGENT",
+      "title": "High-severity image vulnerabilities",
+      "resource_type": "unknown",
+      "resource_name": "opcua-server",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "low",
+      "status": "rejected",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:image_inspect",
+          "resource": "opcua-server",
+          "path": "RepoTags",
+          "value": "fortiphyd/grfics-scadalts:latest",
+          "note": ""
+        },
+        {
+          "source": "agent:findings_list",
+          "resource": "opcua-server",
+          "path": "vulnerabilities",
+          "value": "86 critical, 159 high",
+          "note": ""
+        }
+      ],
+      "explanation": "The container's image contains numerous critical and high-severity vulnerabilities, including unpatched Java libraries and web server components. In an ICS environment, this could allow remote code execution or denial-of-service attacks on the OPC UA service.",
+      "remediation": "Update the image to a patched version; apply runtime restrictions like read-only filesystem and least-privilege capabilities.",
+      "references": [
+        "CVE-2016-1000027",
+        "CVE-2022-22965",
+        "CVE-2023-40743",
+        "CVE-2026-29145",
+        "CVE-2026-34487",
+        "CVE-2026-41293",
+        "CVE-2026-41845",
+        "CVE-2026-44487",
+        "CVE-2026-45623",
+        "CVE-2026-47884",
+        "CVE-2026-54466",
+        "CVE-2026-69219",
+        "CVE-2026-84939"
+      ],
+      "validation_notes": [
+        "resource 'opcua-server' not found in the inventory",
+        "cites CVEs Trivy reported for other images, not opcua-server: CVE-2016-1000027, CVE-2022-22965, CVE-2023-40743, CVE-2026-29145, CVE-2026-34487, CVE-2026-41293, CVE-2026-41845, CVE-2026-44487, CVE-2026-45623, CVE-2026-47884, CVE-2026-54466, CVE-2026-69219, CVE-2026-84939",
+        "no verifiable evidence (no matching field or vulnerability ID)",
+        "unverified fields ignored: RepoTags, vulnerabilities"
+      ]
+    },
+    {
+      "id": "F-AGENT-cfdc4e7bae",
+      "rule_id": "AGENT",
+      "title": "Unpatched Java libraries in ICS containers",
+      "resource_type": "unknown",
+      "resource_name": "ics-simulator",
+      "resource_id": "",
+      "category": "other",
+      "severity": "high",
+      "confidence": "low",
+      "status": "rejected",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:findings_list",
+          "resource": "ics-simulator",
+          "path": "package=jackson-databind",
+          "value": "CVE-2017-15095, CVE-2017-17485",
+          "note": ""
+        },
+        {
+          "source": "agent:findings_list",
+          "resource": "ics-simulator",
+          "path": "package=log4j",
+          "value": "CVE-2019-17571, CVE-2022-23305",
+          "note": ""
+        }
+      ],
+      "explanation": "Java-based components in ICS containers have long-standing remote code execution vulnerabilities. In OT environments, such flaws could be exploited to disrupt control systems.",
+      "remediation": "Replace the base image with a hardened variant and rebuild the container with updated dependencies.",
+      "references": [
+        "CVE-2017-15095",
+        "CVE-2017-17485",
+        "CVE-2019-17571",
+        "CVE-2022-23305"
+      ],
+      "validation_notes": [
+        "resource 'ics-simulator' not found in the inventory",
+        "cites CVEs Trivy reported for other images, not ics-simulator: CVE-2017-15095, CVE-2017-17485, CVE-2019-17571, CVE-2022-23305",
+        "no verifiable evidence (no matching field or vulnerability ID)",
+        "unverified fields ignored: package=jackson-databind, package=log4j"
+      ]
+    },
+    {
+      "id": "F-AGENT-72f1e48bee",
+      "rule_id": "AGENT",
+      "title": "High-risk web server components in OPC UA service",
+      "resource_type": "unknown",
+      "resource_name": "opcua-server",
+      "resource_id": "",
+      "category": "other",
+      "severity": "critical",
+      "confidence": "low",
+      "status": "rejected",
+      "source": "agent",
+      "evidence": [
+        {
+          "source": "agent:findings_list",
+          "resource": "opcua-server",
+          "path": "package=tomcat-catalina",
+          "value": "CVE-2026-43512, CVE-2026-65182",
+          "note": ""
+        },
+        {
+          "source": "agent:findings_list",
+          "resource": "opcua-server",
+          "path": "package=spring-security-core",
+          "value": "CVE-2022-22978",
+          "note": ""
+        }
+      ],
+      "explanation": "Unpatched Tomcat and Spring Security versions in the OPC UA container could allow remote attackers to bypass authentication or execute arbitrary code, directly impacting the industrial control network.",
+      "remediation": "Upgrade Tomcat to 11.0.22+ and Spring Security to 5.5.7+ as per Trivy's recommendations.",
+      "references": [
+        "CVE-2022-22978",
+        "CVE-2026-43512",
+        "CVE-2026-65182"
+      ],
+      "validation_notes": [
+        "resource 'opcua-server' not found in the inventory",
+        "cites CVEs Trivy reported for other images, not opcua-server: CVE-2022-22978, CVE-2026-43512, CVE-2026-65182",
+        "no verifiable evidence (no matching field or vulnerability ID)",
+        "unverified fields ignored: package=tomcat-catalina, package=spring-security-core"
+      ]
+    }
+  ],
+  "out_of_scope": [],
+  "recommendations": [
+    "Immediately rebuild the 'ics-simulator' and 'opcua-server' containers with updated base images (e.g., use 'ubuntu:24.04' instead of 22.04)",
+    "Implement runtime security hardening for all ICS containers: add --read-only, --cap-drop=ALL, and specify least-privilege capabilities",
+    "Isolate ICS container networks using --network=none and expose only essential ports via a hardened reverse proxy",
+    "Establish a vulnerability management pipeline to auto-scan and update ICS container images weekly",
+    "Add health checks and resource limits to prevent denial-of-service risks in critical ICS workloads"
+  ],
+  "limitations": [
+    "Container runtime configurations (ports, capabilities, mounts) could not be verified due to inspection failures",
+    "Unable to assess network topology or inter-container communication patterns",
+    "17 images in inventory (e.g. 'ics_range-attacker:latest') could not be scanned due to missing container associations"
+  ],
+  "validation_notes": [
+    "finding 'High-severity image vulnerabilities' rejected: resource 'ics-simulator' not found in the inventory; cites CVEs Trivy reported for other images, not ics-simulator: CVE-2022-48887, CVE-2023-52920, CVE-2023-53867, CVE-2023-54019, CVE-2024-26954, CVE-2024-35839, CVE-2024-36013, CVE-2024-47736, CVE-2024-50286, CVE-2024-57893, CVE-2025-21945, CVE-2025-21955, CVE-2025-37777, CVE-2025-38162, CVE-2025-40074, CVE-2025-40347, CVE-2025-71074, CVE-2026-23449, CVE-2026-43049, CVE-2026-53375, CVE-2026-63819, CVE-2026-63825, CVE-2026-63940, CVE-2026-64394, CVE-2026-64557, CVE-2026-68426, CVE-2026-72110, CVE-2026-72338, CVE-2026-72380, CVE-2026-72399, CVE-2026-74345, CVE-2026-74506, CVE-2026-74510, CVE-2026-80837, CVE-2026-80864, CVE-2026-80883, CVE-2026-89530, CVE-2026-89537, CVE-2026-89652, CVE-2026-89659, CVE-2026-89708, CVE-2026-90037, CVE-2026-90104, CVE-2026-90162, CVE-2026-90321, CVE-2026-90392, CVE-2026-93221, CVE-2026-93787, CVE-2026-93796, CVE-2026-97530, CVE-2026-98104, CVE-2026-98107, CVE-2026-98260, CVE-2026-98332, CVE-2026-98365; no verifiable evidence (no matching field or vulnerability ID)",
+    "finding 'High-severity image vulnerabilities' rejected: resource 'opcua-server' not found in the inventory; cites CVEs Trivy reported for other images, not opcua-server: CVE-2016-1000027, CVE-2022-22965, CVE-2023-40743, CVE-2026-29145, CVE-2026-34487, CVE-2026-41293, CVE-2026-41845, CVE-2026-44487, CVE-2026-45623, CVE-2026-47884, CVE-2026-54466, CVE-2026-69219, CVE-2026-84939; no verifiable evidence (no matching field or vulnerability ID)",
+    "finding 'Unpatched Java libraries in ICS containers' rejected: resource 'ics-simulator' not found in the inventory; cites CVEs Trivy reported for other images, not ics-simulator: CVE-2017-15095, CVE-2017-17485, CVE-2019-17571, CVE-2022-23305; no verifiable evidence (no matching field or vulnerability ID)",
+    "finding 'High-risk web server components in OPC UA service' rejected: resource 'opcua-server' not found in the inventory; cites CVEs Trivy reported for other images, not opcua-server: CVE-2022-22978, CVE-2026-43512, CVE-2026-65182; no verifiable evidence (no matching field or vulnerability ID)"
+  ],
+  "errors": [],
+  "metrics": {
+    "started_at": "2026-11-03T22:40:50.162920Z",
+    "finished_at": "2026-11-03T22:49:01.045064Z",
+    "duration_seconds": 490.92,
+    "collection_seconds": 0.94,
+    "scan_seconds": 22.7,
+    "agent_seconds": 466.68,
+    "tool_calls_total": 464,
+    "tool_calls_agent": 11,
+    "tool_calls_blocked": 1,
+    "tool_calls_by_name": {
+      "docker.system_version": 1,
+      "docker.container_list": 2,
+      "docker.image_list": 2,
+      "docker.network_list": 1,
+      "docker.volume_list": 1,
+      "trivy.trivy_version": 1,
+      "trivy.scan_image": 11,
+      "trivy.findings_list": 441,
+      "docker.container_inspect": 2,
+      "harness.record_container_section": 2
+    },
+    "redactions": 364,
+    "model_requests": 12,
+    "input_tokens": 203450,
+    "output_tokens": 14443,
+    "total_tokens": 217893
+  }
+}

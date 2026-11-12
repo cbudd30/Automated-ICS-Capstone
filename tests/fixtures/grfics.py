@@ -8,7 +8,7 @@ the same misconfigurations the real lab has:
     router      -> NET_ADMIN + NET_RAW, ip_forward=1, FWUI_SECRET_KEY env,
                    three networks (bridges every zone)
     plc/EWS/HMI -> NET_ADMIN, published UI ports, admin + ICS/DMZ networks
-    HMI         -> a database password in its environment (redaction tests)
+    HMI         -> a database password in its environment (credential finding S001)
 
 Plus two synthetic containers that GRFICS does not have:
 

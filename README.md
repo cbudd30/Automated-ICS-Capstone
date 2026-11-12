@@ -6,9 +6,9 @@ containerized industrial control system (ICS) environments. A single AI agent
 Docker resources through **read-only MCP tools**, decides by itself what to inspect and
 scan, and reports the risks it finds for an OT context. Independently, **deterministic
 security rules** and **Trivy image scans** assess the same environment. The agent never
-sees their results: they are the answer key its findings are scored against. Every run
-produces evidence-backed **JSON and Markdown reports**: what the agent found, what the
-deterministic checks found, and a comparison showing what the agent missed.
+sees their results. Every run
+produces evidence-backed **JSON and Markdown reports**: what the agent found, and what the
+deterministic checks found. The two are independent: nothing scores one against the other.
 
 The first target environment is [GRFICSv3](https://github.com/Fortiphyd/GRFICSv3), a
 Docker-based OT/ICS security lab that simulates a chemical plant. The tool is not tied to
@@ -47,6 +47,14 @@ GRFICS: it assesses whatever runs on the Docker engine it is pointed at.
 
 ## 1. Project status
 
+> **Since 2026-11-09 (harness h4) there is no read-only Docker proxy.** The agent runs in
+> its own container with full Docker access, Docker Desktop shares no Mac folders, and the
+> lab is rebuilt from the `clean-v2` baseline. How to run it, what contains it and how to
+> recover: [`docs/running-the-agent.md`](docs/running-the-agent.md), sections "Every
+> experiment" and "Containment and recovery". Parts of this README below that describe the
+> proxy, `require_proxy` or `clean-v1`, and the verification results in section 14,
+> describe the setup before that date.
+
 Milestone 1 is implemented. Every command in this README was run on the development
 machine (macOS 15, Apple Silicon, Docker Desktop 4.88 / Engine 29.7.2, Ollama 0.40.1).
 
@@ -54,7 +62,7 @@ machine (macOS 15, Apple Silicon, Docker Desktop 4.88 / Engine 29.7.2, Ollama 0.
 |---|---|---|
 | 1 | GRFICSv3 review, MCP research, architecture ([`docs/mcp-selection.md`](docs/mcp-selection.md)) | Done |
 | 2 | uv project, config loading, CLI, tests | Done |
-| 3 | MCP integration: registry, allow-list policy, redaction, result shaping, read-only proxy | Done, verified live |
+| 3 | MCP integration: registry, allow-list policy, result shaping (redaction removed in h3, read-only proxy removed in h4) | Done, verified live |
 | 4 | Model factory: OpenAI, Ollama, vLLM; capability checks | Done. Ollama verified live; OpenAI and vLLM verified with unit tests and mocked HTTP (no API key or vLLM server was available) |
 | 5 | Deterministic rules (20 configuration rules + V001 scanner rule), Trivy integration, findings and evidence schemas | Done, verified live |
 | 6 | Single agent with autonomous tool selection | Done, verified live with `qwen3:14b` |
@@ -66,21 +74,21 @@ machine (macOS 15, Apple Silicon, Docker Desktop 4.88 / Engine 29.7.2, Ollama 0.
 
 ## 2. Quick start
 
-For readers who already have Docker Desktop, uv, Trivy and Ollama (to run the agent in a
-container instead, see [3.10](#310-alternative-run-the-agent-in-a-docker-container)):
+The agent runs in its own container (harness h4). For the full procedure, including the
+GPU VM, see [`docs/running-the-agent.md`](docs/running-the-agent.md):
 
 ```bash
-uv sync                                                    # install into .venv
-cp .env.example .env                                       # optional: API keys / endpoints
-docker compose -f deploy/socket-proxy/compose.yml up -d    # read-only Docker API proxy
-uv run docker-audit setup                                  # trivy-mcp plugin + Trivy DB
-uv run docker-audit models --provider ollama --create-variant qwen3:14b   # 32k context
-uv run docker-audit doctor                                 # everything green?
-uv run docker-audit assess --model local-qwen              # full assessment
+uv sync                                       # host tools: range.sh, model checks
+cp .env.example .env                          # API keys / endpoints
+deploy/agent/build.sh                         # build the agent image
+deploy/agent/run.sh setup                     # Trivy DB in the agent's volume
+deploy/agent/run.sh doctor                    # everything green?
+deploy/grfics/range.sh reset clean-v2         # lab at its known starting state
+caffeinate -i deploy/agent/run.sh assess --model local-vllm --range-baseline clean-v2
 ```
 
-The reports are written to `outputs/<RUN_ID>/`: `agent_report.md`, `deterministic_report.md`
-and `comparison.md` (each with a `.json` twin).
+The reports are written to `outputs/<RUN_ID>/`: `agent_report.md` and
+`deterministic_report.md` (each with a `.json` twin).
 
 ---
 
@@ -129,21 +137,13 @@ Edit `.env` only for what you use: `OPENAI_API_KEY` / `OPENAI_MODEL` for OpenAI,
 is not on `localhost:11434`. `.env` is git-ignored. Its values are read from the
 environment only and are never written to reports, SQLite or logs.
 
-### 3.4 Start the read-only Docker API proxy (required)
+### 3.4 Docker access and containment
 
-The MCP servers never receive the real Docker socket. They talk to
-[`tecnativa/docker-socket-proxy`](https://github.com/Tecnativa/docker-socket-proxy),
-which forwards only `GET`/`HEAD` requests for containers, images, networks, volumes, info
-and version, and answers everything else with `403 Forbidden`:
-
-```bash
-docker compose -f deploy/socket-proxy/compose.yml up -d
-curl -s http://127.0.0.1:2375/version | head -c 80; echo                          # 200 OK
-curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:2375/containers/x/stop  # 403
-```
-
-The proxy listens on `127.0.0.1` only. The application refuses to run if `docker_host`
-is not a proxy that filters requests (`require_proxy: true` in `config/mcp_servers.yaml`).
+There is no read-only proxy since harness h4: the MCP servers use the Docker socket
+(`docker_host: unix:///var/run/docker.sock` in `config/mcp_servers.yaml`) with full
+access. Containment comes from running the agent in its container and from Docker Desktop
+sharing no Mac folders; see "Containment and recovery" in
+[`docs/running-the-agent.md`](docs/running-the-agent.md).
 
 ### 3.5 One-time setup: Trivy plugin and vulnerability database
 
@@ -179,7 +179,7 @@ Two things matter:
 ### 3.7 Verify everything
 
 ```bash
-uv run docker-audit doctor          # config, proxy, MCP servers, Trivy DB, default model
+uv run docker-audit doctor          # config, Docker, MCP servers, Trivy DB, default model
 uv run docker-audit mcp check       # starts both MCP servers, compares tools with the allow-list
 uv run docker-audit models          # every model profile with capability status
 ```
@@ -207,135 +207,13 @@ See [Running GRFICSv3 on macOS](#15-running-grficsv3-on-macos). The assessment t
 the same way against any Docker environment. During development it was run against a
 locally running ICS range (20 containers, 38 images, 8 networks).
 
-### 3.10 (Alternative) Run the agent in a Docker container
+### 3.10 Run the agent in its Docker container
 
-The same agent, config and pinned tools can run in a container instead of the Mac's
-Python environment. Only the packaging changes: the code, the MCP servers, the tool
-allow-list, the ToolPolicy and the proxy boundary are the ones described in this README.
-Ollama stays on the host. Prerequisites: Docker Desktop and Ollama (you do not need uv,
-Python or Trivy on the host for this path).
-
-| File | Purpose |
-|---|---|
-| [`Dockerfile`](Dockerfile) | `runtime` image: Python 3.12 + `uv.lock` dependencies, uv/uvx with `docker-mcp-server==2.2.7` pre-cached (plus the managed CPython 3.14.7 it needs), Trivy 0.75.0 + plugin `mcp@v0.0.20`. Runs as uid 10001. `test` image: + dev dependencies and tests. |
-| [`deploy/agent/compose.yml`](deploy/agent/compose.yml) | `agent` service (one-shot CLI containers) and `test` service |
-| [`deploy/agent/build.sh`](deploy/agent/build.sh) | builds both images and records the git commit for run manifests |
-| [`deploy/socket-proxy/compose.yml`](deploy/socket-proxy/compose.yml) | unchanged proxy, now also attached to the internal `docker-audit-mgmt` network |
-| [`deploy/agent/compose.grfics.example.yml`](deploy/agent/compose.grfics.example.yml) | example only, never loaded by default: how to attach the agent to GRFICS networks later |
-
-**Build, start, stop, test**
-
-```bash
-# 1. The read-only proxy (creates the internal docker-audit-mgmt network)
-docker compose -f deploy/socket-proxy/compose.yml up -d
-
-# 2. Build the images (agent + tests). build.sh = `docker compose build` plus the git
-#    commit/dirty flag for run manifests (the image has no .git).
-deploy/agent/build.sh
-
-# 3. One-time: download the Trivy DBs into the trivy-cache volume. The Java DB (for
-#    JAR files) is not part of `setup`; fetch it too, or the first scan of a Java
-#    image (e.g. Elasticsearch) can fail with "failed to scan project".
-docker compose -f deploy/agent/compose.yml run --rm agent setup
-docker compose -f deploy/agent/compose.yml run --rm --entrypoint trivy agent image --download-java-db-only
-
-# 4. Preflight (the image's default command): config, proxy, MCP servers, Trivy DB, model
-docker compose -f deploy/agent/compose.yml run --rm agent            # = doctor
-docker compose -f deploy/agent/compose.yml run --rm agent doctor --probe
-docker compose -f deploy/agent/compose.yml run --rm agent mcp check
-
-# 5. Use it exactly like the host CLI: everything after `agent` goes to docker-audit
-docker compose -f deploy/agent/compose.yml run --rm agent inventory
-docker compose -f deploy/agent/compose.yml run --rm agent assess --no-agent
-docker compose -f deploy/agent/compose.yml run --rm agent assess --model local-qwen
-docker compose -f deploy/agent/compose.yml run --rm agent runs
-
-# 6. Automated tests inside the image (no network)
-docker compose -f deploy/agent/compose.yml run --rm test
-docker compose -f deploy/agent/compose.yml run --rm test tests/unit -q   # any pytest args
-
-# Stop / clean up. Containers are removed after each run (--rm), so there is nothing
-# long-running to stop. `down` removes the project's network; add -v to also delete
-# the Trivy DB volume. Reports and SQLite live in ./data and ./outputs and are kept.
-docker compose -f deploy/agent/compose.yml down
-docker compose -f deploy/socket-proxy/compose.yml down    # only if the host workflow is not in use
-```
-
-**How the container reaches its dependencies**
-
-```text
- Mac (host)                                   Docker Desktop VM
- ─────────────                                ──────────────────────────────────────────────
- Ollama 127.0.0.1:11434  ◄── host.docker.internal ──┐
-                                                    │  network: docker-audit-agent_default
-                                       ┌────────────┴─────────────┐
- ./config  (ro) ──────────────────────►│ agent container (uid     │
- ./data    (SQLite, baselines) ◄──────►│ 10001, cap_drop ALL)     │
- ./outputs (reports, manifests) ◄─────►│  docker-audit (Python)   │
- volume trivy-cache (Trivy DB) ◄──────►│   ├─ uvx docker-mcp-server   (stdio subprocess)
-                                       │   └─ trivy mcp               (stdio subprocess)
-                                       └────────────┬─────────────┘
-                                                    │  network: docker-audit-mgmt (internal)
-                                       ┌────────────┴─────────────┐
-                                       │ docker-audit-socket-proxy│── /var/run/docker.sock (ro)
-                                       │ GET/HEAD only, 403 rest  │   (only the proxy mounts it)
-                                       └──────────────────────────┘
-```
-
-- **Ollama.** `OLLAMA_BASE_URL` is set to `http://host.docker.internal:11434/v1`. Docker
-  Desktop resolves `host.docker.internal` to the Mac and forwards to its loopback, so
-  Ollama's default `127.0.0.1` listener works unchanged. The model never runs in the
-  container.
-- **Docker MCP.** `docker-mcp-server` is launched by the agent as a stdio subprocess, as
-  on the host, from the pinned copy cached in the image (uv runs offline; nothing is
-  downloaded at runtime). Its `DOCKER_HOST` is `tcp://docker-audit-socket-proxy:2375`:
-  the proxy's container name on the `docker-audit-mgmt` network. That network is
-  `internal` (no route out) and only the proxy and the agent are attached. The agent
-  container has no Docker socket. `require_proxy: true` still refuses to start if the
-  endpoint does not answer `GET /secrets` with 403.
-- **Trivy.** `trivy mcp` also runs as a stdio subprocess. Trivy pulls image contents
-  through the same proxy (`GET /images/{id}/get`), and its vulnerability DB lives in the
-  `trivy-cache` volume (filled by `setup`, kept across runs).
-- **Persistence.** `./data` and `./outputs` are bind-mounted, so the container uses the
-  same `assessments.db`, `agent_sessions.db`, range baselines, reports and manifests as
-  host runs (`docker-audit runs` lists both). `./config` is mounted read-only.
-
-**Configuration (environment variables, all optional).** Compose variables are named
-`AGENT_*` so they never collide with the host-workflow values in `.env`. `.env` itself
-is still read for API keys (`OPENAI_API_KEY`, ...).
-
-| Variable | Default | Becomes in the container |
-|---|---|---|
-| `AGENT_OLLAMA_BASE_URL` | `http://host.docker.internal:11434/v1` | `OLLAMA_BASE_URL` |
-| `AGENT_VLLM_BASE_URL` | `http://host.docker.internal:8000/v1` | `VLLM_BASE_URL` |
-| `AGENT_DOCKER_HOST` | `tcp://docker-audit-socket-proxy:2375` | `DOCKER_AUDIT_DOCKER_HOST` |
-| `AGENT_CONFIG_DIR` / `AGENT_DATA_DIR` / `AGENT_OUTPUT_DIR` | `./config` / `./data` / `./outputs` | mounted at `/app/config` (ro) / `/app/data` / `/app/outputs` |
-| `AGENT_IMAGE` / `AGENT_TEST_IMAGE` | `docker-audit-agent:latest` / `:test` | image tags |
-
-**Hardening.** Non-root user, `cap_drop: [ALL]`, `no-new-privileges`, not privileged, no
-Docker socket, `/tmp` on a `noexec` tmpfs, `pids_limit: 512`, `init` to reap MCP
-subprocesses. The root filesystem is left writable because uv must take a lock in its
-cache even when running offline; that layer is discarded after every `--rm` run. The
-agent's own containers (`docker-audit-agent-*`) are in `ignore_containers`, like the
-proxy.
-
-**Attaching to GRFICS networks later (not done now).** The image needs no change. Docker
-networks are attached to *containers*, so the next phase only adds networks to the
-`agent` service, declared `external` so Compose never creates or alters GRFICS's own
-networks:
-
-```bash
-docker network ls                       # e.g. grficsv3_c-dmz-net, grficsv3_b-ics-net
-GRFICS_DMZ_NETWORK=grficsv3_c-dmz-net \
-docker compose -f deploy/agent/compose.yml -f deploy/agent/compose.grfics.example.yml \
-  run --rm agent doctor
-```
-
-The container then gets one more interface with an address on that subnet, and Docker's
-embedded DNS resolves GRFICS containers by name on it. Its other two networks are
-unchanged: Ollama is still reached through the default network, and Docker metadata
-still only through the proxy on `docker-audit-mgmt`. Joining a network adds no tools.
-What the agent can do is still decided by the MCP allow-list and ToolPolicy.
+This is now the standard way to run the agent (harness h4). `deploy/agent/compose.yml`
+mounts no Mac folder: config is built into the image, the agent reaches Docker through the
+socket, and `deploy/agent/run.sh` copies each run's `outputs/<RUN_ID>/` and databases
+(`data/container/`) back to the Mac with `docker cp`. Steps: see
+[`docs/running-the-agent.md`](docs/running-the-agent.md).
 
 ---
 
@@ -357,39 +235,32 @@ One `docker-audit assess` run (`src/docker_security_agent/pipeline.py`):
                   which containers, networks and images to inspect and which images to
                   scan, and returns its own findings, each with the tool, field and value
                   it is based on (AgentAssessment)
-4. validate       every resource, field and CVE the agent cites is checked against the
-                  evidence from step 2; ungrounded findings are rejected, invented CVEs
-                  scrubbed
-5. compare        agent findings vs deterministic findings: found / missed / outside
-                  the rules / rejected, recall and other scores
-6. persist        findings, scans, tool calls, metrics, the three reports -> SQLite
-7. reports        outputs/<RUN_ID>/agent_report.{json,md}, deterministic_report.{json,md},
-                  comparison.{json,md}
+4. persist        findings, scans, tool calls, metrics, the two reports -> SQLite
+5. reports        outputs/<RUN_ID>/agent_report.{json,md}, deterministic_report.{json,md}
+                  (the agent's findings are reported as it gave them, unchecked)
 ```
 
 **Why step 2 runs first.** The agent's guard rails need the inventory: the tool policy
-only lets Trivy scan images that exist (and that the answer key covers), and validation
-checks the agent's claims against it. The agent itself gets nothing from it: no summary,
+only lets Trivy scan images that exist. The agent itself gets nothing from it: no summary,
 no finding counts, no stored scans. It has to discover the environment with its tools,
 which is what makes its tool use and its findings comparable across models.
 
 **Division of labor.** Deterministic code decides *what is objectively true*: rule
 matches, scanner output, schema validity and evidence linkage. The agent shows *what an
 LLM can discover on its own* and how it explains and prioritizes it for an OT
-environment. The comparison measures the gap. If the agent fails (timeout, bad output,
-weak tool calling), the deterministic report is still produced and the comparison shows
-every finding as missed.
+environment. The two reports are read side by side; there is no automatic scoring. If the
+agent fails (timeout, bad output, weak tool calling), the deterministic report is still
+produced.
 
 **Three modes:**
 
 | Mode | Command | Docker access | LLM | Reports |
 |---|---|---|---|---|
-| live | `assess --model X` | yes (read-only) | yes | agent, deterministic, comparison |
+| live | `assess --model X` | yes (read-only) | yes | agent, deterministic |
 | deterministic | `assess --no-agent` | yes (read-only) | no | deterministic |
-| replay | `assess --no-agent --snapshot SNAP_ID` | **none** (stored evidence) | no | deterministic |
-
-Agent runs cannot be replayed on stored evidence, because the agent needs live MCP tools.
-To compare models fairly, reset the range to the same baseline before each live run (see
+Every run collects fresh evidence from the live lab (replay of stored evidence was removed
+on 2026-11-09). To compare models fairly, reset the range to the same baseline before each
+live run (see
 [Resetting the range](#resetting-the-range-between-runs)).
 
 ---
@@ -412,7 +283,7 @@ To compare models fairly, reset the range to the same baseline before each live 
    - OpenAI  (Responses)   MCPServerStdio                     (agent conversations)
    - Ollama  (ChatCompl.)  + ToolPolicy (allow-list,        - AssessmentRepository
    - vLLM    (ChatCompl.)    argument rules)                  (runs, snapshots, scans,
-  llm/capabilities.py      + Redactor (secrets)               vulns, findings,
+  llm/capabilities.py      + (no redaction since h3)          vulns, findings,
    (tools / context /      + shaping (compact results)        tool_calls)
     structured output)     + ToolCallRecorder (audit)
        |                   + leak guardrail (SDK)
@@ -433,12 +304,11 @@ To compare models fairly, reset the range to the same baseline before each live 
      tools = the approved MCP tools ONLY (no access to the deterministic results)
                                  |
                                  v
-   security/ rules.py · vulnerability_parser.py · scanner.py   (answer key)
-             validation.py · comparison.py                      (agent vs answer key)
+   security/ rules.py · vulnerability_parser.py · scanner.py   (deterministic findings)
                                  |
                                  v
-   reporting/ agent_report.py · generator.py · comparison_report.py
-              -> agent_report · deterministic_report · comparison (.json + .md)
+   reporting/ agent_report.py · generator.py
+              -> agent_report · deterministic_report (.json + .md)
 ```
 
 The application runs on the macOS host in a project-specific `.venv`. It never runs inside
@@ -449,15 +319,16 @@ GRFICS's Kali container, never joins the GRFICS networks, and does not scan netw
 ## 6. Security boundaries
 
 Docker daemon access can amount to root on the host, even when a tool only *intends* to
-read. Hiding tools from the agent is therefore one layer of protection, not the boundary.
-Four independent layers apply, and each was verified on the live host:
+read. Since harness h4 the agent deliberately has that access; layers 1 and 4 below were
+removed, and containment (the agent's container plus no Docker Desktop file sharing)
+keeps it inside Docker. The table records all four original layers:
 
 | # | Layer | Mechanism | Verified |
 |---|---|---|---|
-| 1 | **API boundary** | `docker-socket-proxy`: `POST=0`; only CONTAINERS/IMAGES/NETWORKS/VOLUMES/INFO/VERSION enabled; bound to 127.0.0.1. MCP servers get `DOCKER_HOST=tcp://127.0.0.1:2375` and never the socket. | `POST .../exec`, `POST .../stop` and `GET /secrets` → **403**. During assessments the proxy log shows only GET/HEAD. |
+| 1 | **API boundary (removed in harness h4)** | Was `docker-socket-proxy`: `POST=0`; only CONTAINERS/IMAGES/NETWORKS/VOLUMES/INFO/VERSION enabled; bound to 127.0.0.1. MCP servers get `DOCKER_HOST=tcp://127.0.0.1:2375` and never the socket. | `POST .../exec`, `POST .../stop` and `GET /secrets` → **403**. During assessments the proxy log shows only GET/HEAD. |
 | 2 | **Server mode** | `DOCKER_MCP_SERVER_READONLY=1` unregisters mutating tools. | 77 tools remain, including `secret_inspect`, `swarm_join_tokens`, `container_archive_get`. **Read-only mode is not enough on its own.** |
 | 3 | **Tool allow-list** | `allowed_tools` in `config/mcp_servers.yaml`, applied to *visibility* (SDK `create_static_tool_filter`) and again at *call time* (`ToolPolicy`). Trivy `scan_image` may only target images in the current inventory, `secret` scanning is stripped, and output is forced to JSON. | `mcp check`: 11 of 77 Docker tools and 4 of 6 Trivy tools are exposed. Integration tests call `container_exec` and `scan_filesystem` directly and they are refused before reaching the server. |
-| 4 | **Redaction** | Every tool result is scrubbed *before* it reaches the model, logs or SQLite. Environment variables keep the NAME but lose the VALUE (except allow-listed names such as `PATH`). Sensitive JSON keys and secret-shaped strings (URL credentials, PEM keys, AWS/GitHub/OpenAI/Slack tokens, JWTs, `--password x`) are replaced. An SDK `tool_output_guardrail` withholds any result in which a secret pattern still survives. | Fixture secrets never appear in snapshots, tool output seen by the model, SQLite or reports (unit and integration tests). 227 values were redacted in a live run. |
+| 4 | **Redaction (removed in harness h3)** | Tool results are no longer scrubbed: finding credentials is part of this experimental lab, so environment values, labels and secrets reach the model, SQLite and the reports as Docker returns them. | `tests/integration`: credential values are present in what the agent sees and in the snapshot. |
 
 Other controls:
 
@@ -470,11 +341,11 @@ Other controls:
   are configurable in `config/agent.yaml`.
 - **The range reset is outside the boundary on purpose.** `deploy/grfics/range.sh` changes
   the lab, so it uses the operator's own Docker access and is never available to the agent.
-  docker-audit only *verifies* resets, read-only through the proxy.
-- **Proxy override is never silent.** If `require_proxy: false`, every live run records the
-  endpoint used and whether the proxy was verified (`runs.docker_endpoint_json`,
-  `deterministic_report.json` → `docker_endpoint`), puts a caution banner at the top of `deterministic_report.md`, and
-  prints a red security warning in the CLI.
+  docker-audit only *verifies* resets.
+- **Containment instead of a proxy (harness h4).** The agent runs in a container that mounts
+  no Mac folder, and Docker Desktop shares no Mac folders (`mounts denied`), so its full
+  Docker access stays inside Docker. Every live run records the Docker endpoint it used
+  (`runs.docker_endpoint_json`). See "Containment and recovery" in the runbook.
 - **Tracing is off by default.** The SDK would otherwise upload traces, including Docker
   metadata, to OpenAI even when a local model is used.
 - **Read-only verification.** The end-to-end tests compare a fingerprint of all
@@ -495,7 +366,7 @@ Full evaluation and live verification results: [`docs/mcp-selection.md`](docs/mc
 | Deferred | Docker MCP Toolkit / Gateway | catalog and gateway only; provides no inventory tools itself |
 
 **No custom MCP server was built.** The only MCP-adjacent code is the thin wrapper
-(`GuardedMCPServer`) that adds policy, redaction, shaping and recording around the SDK's
+(`GuardedMCPServer`) that adds policy, shaping and recording around the SDK's
 own `MCPServerStdio`. To enable or disable a server or tool, edit
 `config/mcp_servers.yaml`; the agent code does not change.
 
@@ -606,36 +477,21 @@ give the same ID across runs and models), `resource`, `category`, `severity`,
 | status | source | meaning |
 |---|---|---|
 | `confirmed` | `rule` / `scanner` | an objective fact from Docker metadata or Trivy |
-| `potential` | `agent` | a finding the agent reported that passed evidence validation; needs human review |
-| `rejected` | `agent` | an agent claim that failed validation (unknown resource, field not present, CVE Trivy did not report for that image); kept for transparency |
+| `potential` | `agent` | a finding the agent reported, as it gave it (not checked against the data); needs human review |
 
 **Agent findings.** The agent returns each finding with `resource_name`, `severity`,
 `evidence` (the tool it used, the field path such as `HostConfig.Privileged`, and the value
 it saw), `vulnerability_ids` (CVE/GHSA IDs for image vulnerabilities), `explanation` and
-`remediation` (`AgentAssessment` in `schemas/reports.py`). Validation
-(`security/validation.py`) requires the resource to exist and at least one cited field to
-exist on that resource (or a CVE that Trivy reported for that resource's image). A value
-that differs from the inspect data lowers the finding's confidence but does not reject it,
-because models paraphrase values.
+`remediation` (`AgentAssessment` in `schemas/reports.py`). These are reported as the agent
+gave them: nothing checks that the resource, field or CVE is real (the validator was
+removed on 2026-11-09), so every agent finding has confidence `low` and needs human review.
 
-**The three reports** (`outputs/<RUN_ID>/`):
+**The two reports** (`outputs/<RUN_ID>/`):
 
 | File | Contents |
 |---|---|
-| `agent_report.md` / `.json` | Only what the agent found: summary, its overall risk, validated findings with evidence, rejected findings, recommendations, its stated limitations, metrics |
+| `agent_report.md` / `.json` | Only what the agent found: summary, its overall risk, its findings with evidence (unchecked), recommendations, its stated limitations, metrics |
 | `deterministic_report.md` / `.json` | No AI: 1 summary · 2 environment overview · 3 container inventory · 4 image inventory · 5 network configuration · 6 prioritized findings · 7 misconfigurations · 8 known image vulnerabilities · 9 remediation · 10 limitations · 11 execution metrics |
-| `comparison.md` / `.json` | Scores (recall, severity-weighted recall, match and rejection rates), recall per severity, the deterministic findings the agent **missed**, the ones it found (with its severity vs the rule's), agent findings outside the rules, rejected findings, and how matching works |
-
-**How matching works** (`security/comparison.py`). An agent finding covers a deterministic
-finding when it names the same resource and cites the same Docker field as the rule's
-evidence (one path a prefix of the other, list indexes ignored, a few equivalent fields
-accepted, e.g. `HostConfig.PortBindings` / `NetworkSettings.Ports`). For image findings, a
-container running the image also counts. Image vulnerabilities (V001) are scored per
-image: covered when the agent reported at least one CVE Trivy found in that image. Where
-two rules use the same field, the agent's wording decides (`docker.sock` -> socket mount
-C008, otherwise sensitive bind mount C009). Matching never uses rule IDs, which the agent
-does not know. Severity-weighted recall weights findings critical 4, high 3, medium 2,
-low 1, info 0.
 
 A sample report from an earlier version (one combined `report.md`, before the agent was
 separated from the deterministic results) is in [`docs/sample-report/`](docs/sample-report/).
@@ -647,7 +503,7 @@ separated from the deterministic results) is in [`docs/sample-report/`](docs/sam
 | Store | File | Contents |
 |---|---|---|
 | Agent sessions | `data/agent_sessions.db` | OpenAI Agents SDK `SQLiteSession` (conversation history). Each run gets a new session by default; `--session NAME` continues a named one. |
-| Assessment store | `data/assessments.db` | `runs` (model provider, ID and config, prompt version, MCP server versions, objective, snapshot, status, errors, metrics, the deterministic report, the agent report, the comparison), `snapshots`, `scans`, `vulnerabilities`, `findings` (rule, scanner and agent), `tool_calls` |
+| Assessment store | `data/assessments.db` | `runs` (model provider, ID and config, prompt version, MCP server versions, objective, snapshot, status, errors, metrics, the deterministic report, the agent report), `snapshots`, `scans`, `vulnerabilities`, `findings` (rule, scanner and agent), `tool_calls` |
 
 **Comparing models on the same environment:** reset the range before each run, so every
 model starts from the same verified state and is scored against the same answer key.
@@ -659,14 +515,14 @@ uv run docker-audit assess --model local-qwen     --range-baseline clean-v1
 deploy/grfics/range.sh reset clean-v1
 uv run docker-audit assess --model local-gpt-oss  --range-baseline clean-v1
 uv run docker-audit runs
-uv run docker-audit report --run-id run-XXXX      # comparison (default); --kind agent|deterministic
+uv run docker-audit report --run-id run-XXXX      # agent report (default); --kind deterministic
 ```
 
 Snapshot IDs are content hashes of the security-relevant data. Volatile fields such as
 PIDs and health-check timestamps are excluded, so an unchanged environment produces the
 same ID. Each run records the prompt version (`PROMPT_VERSION` in
-`src/docker_security_agent/__init__.py`), tool calls (name, redacted arguments, duration,
-status), token usage, timings, validation notes and completion status. Historical
+`src/docker_security_agent/__init__.py`), tool calls (name, arguments, duration,
+status), token usage, timings and completion status. Historical
 findings are always tied to their run and snapshot and are never presented as current
 state.
 
@@ -689,22 +545,9 @@ The rest of the manifest records the run ID and time, the framework commit (with
 for uncommitted changes), and how the evidence was gathered (MCP servers, Docker
 endpoint, scan settings).
 
-Re-run a manifest:
-
-```bash
-uv run docker-audit assess --manifest outputs/run-XXXX/manifest.json   # or: --manifest run-XXXX
-```
-
-The re-run takes its whole configuration from the manifest, not from the local YAML, and
-its own manifest records `replay_of`. A **deterministic** manifest is replayed on its pinned
-evidence (Docker is never contacted) and gets the **same `config_sha256`**. An **agent**
-manifest is re-run **live**, because the agent needs MCP tools: it must match the
-original's range baseline (when it had one), and its configuration is identical except
-the freshly collected evidence (snapshot and scan IDs), so its `config_sha256` differs.
-Group agent runs for comparison by range baseline, prompt version and model. A manifest whose
-hash does not match is refused. A changed prompt or schema is refused unless you pass
-`--allow-drift`, which records the drift in the run. A different framework commit is
-recorded as a note.
+The manifest is a record only: runs can no longer be re-run from it (`--manifest` and
+`--allow-drift` were removed on 2026-11-09). Group agent runs for comparison by range
+baseline, prompt version and model.
 
 ---
 
@@ -712,21 +555,19 @@ recorded as a note.
 
 | Command | Purpose |
 |---|---|
-| `docker-audit doctor [--probe]` | Validate config, proxy, MCP servers, Trivy DB and default model |
+| `docker-audit doctor [--probe]` | Validate config, Docker, MCP servers, Trivy DB and default model |
 | `docker-audit setup [--skip-db]` | Install the trivy-mcp plugin; download/refresh the Trivy DB |
 | `docker-audit models [--provider openai\|ollama\|vllm] [--probe]` | Model profiles with capability status; `--provider ollama` lists installed models |
 | `docker-audit models --provider ollama --create-variant MODEL [--num-ctx N]` | Create a larger-context Ollama variant |
 | `docker-audit mcp check` | Start each MCP server; registered vs. exposed vs. missing tools |
 | `docker-audit mcp tools` | Exactly the tools (and descriptions) the agent sees |
 | `docker-audit inventory [--json] [--no-save]` | Read-only inventory snapshot |
-| `docker-audit assess [--model P] [--no-agent [--snapshot ID]] [--no-scan] [--session NAME] [--objective TEXT] [--skip-model-check]` | Run an assessment (`--snapshot` re-runs the rules on stored evidence; deterministic only) |
-| `docker-audit assess --manifest FILE\|RUN_ID [--allow-drift]` | Re-run a run manifest's configuration (deterministic: on its pinned evidence; agent: live) |
+| `docker-audit assess [--model P] [--no-agent] [--no-scan] [--session NAME] [--objective TEXT] [--skip-model-check]` | Run an assessment on the live lab |
 | `docker-audit assess ... --range-baseline NAME` | Abort unless the live range matches baseline NAME; recorded in the manifest |
 | `docker-audit range record NAME` / `range verify NAME [--since ISO [--project P]]` / `range list` | Record or verify a named range baseline (read-only) |
 | `deploy/grfics/range.sh save NAME` / `reset NAME` / `list` | Operator script: archive the lab as a baseline / reset the lab to it (changes the lab) |
 | `docker-audit runs [--limit N]` | List runs |
-| `docker-audit snapshots [--limit N]` | List stored snapshots |
-| `docker-audit report --run-id ID [--kind comparison\|agent\|deterministic] [--format md\|json\|path] [--raw]` | Show a stored report (default: the comparison) |
+| `docker-audit report --run-id ID [--kind agent\|deterministic] [--format md\|json\|path] [--raw]` | Show a stored report (default: the agent report) |
 
 ---
 
@@ -736,33 +577,30 @@ Every module starts with a docstring explaining its role. A suggested reading or
 
 1. `src/docker_security_agent/__init__.py`: package map and prompt version.
 2. `pipeline.py`: the whole workflow, top to bottom.
-3. `mcp/servers.py`: `GuardedMCPServer`, the security-critical wrapper (policy, redaction,
+3. `mcp/servers.py`: `GuardedMCPServer`, the security-critical wrapper (policy,
    shaping, recording).
-4. `mcp/policy.py`, `mcp/redaction.py`, `mcp/shaping.py`, `mcp/registry.py`.
+4. `mcp/policy.py`, `mcp/shaping.py`, `mcp/registry.py`.
 5. `inventory/collector.py` and `inventory/parsers.py`: Docker JSON to typed assets.
 6. `security/rules.py`: the 20 rules (each a small, documented function).
 7. `security/scanner.py` and `security/vulnerability_parser.py`: Trivy via MCP.
 8. `agents/security_assessment.py`: instructions, first message, agent construction (MCP
    tools only), run limits.
-9. `security/validation.py`: how LLM hallucinations are caught.
-10. `security/comparison.py`: how the agent's findings are scored against the rules.
-11. `reporting/agent_report.py`, `reporting/generator.py`, `reporting/comparison_report.py`,
+9. `reporting/agent_report.py`, `reporting/generator.py`,
     `memory/repository.py`, `llm/factory.py`, `llm/capabilities.py`, `cli.py`.
 
 ```text
 .
 ├── config/                 models · agent · mcp_servers · security_rules · experiment (.yaml)
 ├── deploy/
-│   ├── socket-proxy/compose.yml      read-only Docker API proxy
 │   └── grfics/docker-compose.macos.yml  GRFICSv3 macvlan -> bridge override
 ├── docs/  mcp-selection.md · sample-report/
 ├── src/docker_security_agent/
 │   ├── cli.py · config.py · pipeline.py
 │   ├── agents/security_assessment.py
 │   ├── llm/        factory.py · capabilities.py
-│   ├── mcp/        servers.py · policy.py · redaction.py · shaping.py · recorder.py · registry.py
+│   ├── mcp/        servers.py · policy.py · shaping.py · recorder.py · registry.py
 │   ├── inventory/  collector.py · parsers.py
-│   ├── security/   rules.py · findings.py · scanner.py · vulnerability_parser.py · validation.py
+│   ├── security/   rules.py · findings.py · scanner.py · vulnerability_parser.py
 │   ├── memory/     database.py · repository.py · sessions.py
 │   ├── schemas/    assets.py · findings.py · observations.py · reports.py
 │   └── reporting/  generator.py
@@ -783,8 +621,8 @@ uv run pytest -m "e2e and llm"     # + live agent run with the default model
 
 | Level | Files | What it covers | Needs |
 |---|---|---|---|
-| Unit (78) | `tests/unit/` | config validation; env expansion; redaction (env, keys, 8 secret formats, harmless values untouched); policy (allow-list, scan targets, argument normalization); shaping (compaction, trivy `meta` removed, truncation); parsers; stable snapshot IDs; all rules against GRFICS-like fixtures (incl. a hardened container with **zero** findings); Trivy parsing and pagination; validation (invented CVEs, CVEs of another image, ungrounded findings, missing fields, value mismatch, out-of-scope infrastructure); comparison (field and prefix matching, aliases, wording tie-breaks, image findings via containers, rejected findings never count, scores); SQLite repository; the three reports and their Markdown sections; model factory; Ollama/vLLM/OpenAI capability checks (mocked HTTP); prompted-JSON parsing; snapshot IDs independent of Docker's mount ordering | nothing |
-| Integration (11) | `tests/integration/` | real MCP subprocesses (fake docker/trivy servers): hidden and refused dangerous tools, redaction over MCP, collection, scan pagination, graceful server failure; **real SDK agent loop** with the SDK's `ScriptedModel` (MCP-only tools, a first message without inventory or findings, session persistence, tool budget, max turns, invalid output); full pipeline live-with-fakes producing all three reports, an agent scan outside the answer key refused, deterministic replay without Docker, agent replay refused, failed agent still producing reports, live re-run of an agent manifest | Python only |
+| Unit (78) | `tests/unit/` | config validation; env expansion; policy (allow-list, scan targets, argument normalization); shaping (compaction, trivy `meta` removed, truncation); parsers; stable snapshot IDs; all rules against GRFICS-like fixtures (incl. a hardened container with **zero** findings); Trivy parsing and pagination; comparison (field and prefix matching, aliases, wording tie-breaks, image findings via containers, rejected findings never count, scores); SQLite repository; the two reports and their Markdown sections; model factory; Ollama/vLLM/OpenAI capability checks (mocked HTTP); prompted-JSON parsing; snapshot IDs independent of Docker's mount ordering | nothing |
+| Integration (11) | `tests/integration/` | real MCP subprocesses (fake docker/trivy servers): hidden and refused dangerous tools, unredacted results over MCP, collection, scan pagination, graceful server failure; **real SDK agent loop** with the SDK's `ScriptedModel` (MCP-only tools, a first message without inventory or findings, session persistence, tool budget, max turns, invalid output); full pipeline live-with-fakes producing both reports, an agent scan outside the answer key refused, failed agent still producing reports, live re-run of an agent manifest | Python only |
 | End-to-end (2) | `tests/e2e/` | full assessment against the real Docker host; Docker state fingerprint unchanged; no write request reached the proxy; live agent run | Docker + proxy + Trivy (+ Ollama for `llm`) |
 
 The mocked tests use the OpenAI Agents SDK's own test double
@@ -897,9 +735,10 @@ engine dedicated to it: unrelated containers show up as differences.
 - **Trivy OS coverage.** Some distributions are not supported (e.g. Kali, used by
   GRFICS's attacker container). Such images return zero findings and are reported as
   "not assessed" rather than clean.
-- **Pattern-based redaction.** It errs toward over-redaction (for example, all
-  non-allow-listed env values are removed). Novel secret formats could slip through the
-  regex layer; the leak guardrail is a second check, also pattern-based.
+- **No redaction (since harness h3).** Credential values in environment variables and
+  labels reach the model, the SQLite databases and the reports unmodified, because
+  finding credentials is part of this experimental lab. Treat `data/` and `outputs/`
+  as sensitive.
 - **Small local models make mistakes.** Observed in live runs with `qwen3:14b`:
   - attaching a correct rationale to the wrong finding ID, and flagging the audit's own
     proxy. (Prompt v3; since v4 the agent ranks nothing it did not find itself, and
@@ -922,7 +761,8 @@ engine dedicated to it: unrelated containers show up as differences.
   is pinned; the fallback would be a small adapter around `trivy image --format json`.
 - **Prompt injection.** Labels or container names could contain hostile text. The agent
   is told to treat tool output as data, and it has no write capability, so the worst case
-  is a misleading report. Validation limits invented facts but not misleading wording.
+  is a misleading report. Agent findings are not validated, so invented facts can also
+  appear in it.
 - **macOS Option B networking** differs from upstream GRFICS (see section 15).
 - **Containerized agent** (section 3.10):
   - The agent's own container is ignored by the rules, but its image is in use while it
@@ -959,9 +799,8 @@ engine dedicated to it: unrelated containers show up as differences.
 
 **Milestone 2: model-comparison harness and pre-deployment analysis**
 
-1. A `docker-audit compare --runs a,b,c` command that tabulates the per-run comparison
-   scores (recall, weighted recall, match and rejection rates, tool calls, tokens,
-   latency) across models and prompt versions. Every run already stores its comparison.
+1. A `docker-audit compare --runs a,b,c` command that tabulates per-run results (findings,
+   rejections, tool calls, tokens, latency) across models and prompt versions.
 2. Static analysis of `docker-compose.yml` before deployment, so GRFICS can be assessed
    without running it (same rules, a different collector).
 3. Mapping findings to the CIS Docker Benchmark and to MITRE ATT&CK for ICS techniques.

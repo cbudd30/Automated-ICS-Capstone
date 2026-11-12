@@ -13,25 +13,19 @@ from docker_security_agent.reporting.agent_report import (
     render_agent_markdown,
     write_agent_report,
 )
-from docker_security_agent.reporting.comparison_report import (
-    render_comparison_markdown,
-    write_comparison,
-)
 from docker_security_agent.reporting.generator import build_report, render_markdown, write_report
+from docker_security_agent.schemas.assets import InventorySnapshot
 from docker_security_agent.schemas.observations import ImageScanResult, ToolCallRecord
 from docker_security_agent.schemas.reports import (
     AgentAssessment,
     AgentEvidence,
     AgentFinding,
     AgentReport,
-    Comparison,
     ModelInfo,
     Report,
     RunMetrics,
 )
 from docker_security_agent.security import rules
-from docker_security_agent.security.comparison import compare
-from docker_security_agent.security.validation import validate_agent_output
 from docker_security_agent.security.vulnerability_parser import (
     count_by_severity,
     parse_findings_page,
@@ -89,9 +83,9 @@ def test_run_lifecycle(repo):
 def test_snapshot_roundtrip_and_dedupe(repo, snapshot):
     repo.save_snapshot(snapshot)
     repo.save_snapshot(snapshot)  # same ID -> stored once
-    assert len(repo.list_snapshots()) == 1
-    loaded = repo.load_snapshot(snapshot.snapshot_id)
-    assert loaded.snapshot_id == snapshot.snapshot_id
+    rows = repo.conn.execute("SELECT snapshot_id, data_json FROM snapshots").fetchall()
+    assert [r["snapshot_id"] for r in rows] == [snapshot.snapshot_id]
+    loaded = InventorySnapshot.model_validate_json(rows[0]["data_json"])
     assert loaded.compute_id() == snapshot.snapshot_id
     assert [c.name for c in loaded.containers] == [c.name for c in snapshot.containers]
 
@@ -99,10 +93,11 @@ def test_snapshot_roundtrip_and_dedupe(repo, snapshot):
 def test_scans_findings_tool_calls(repo, snapshot, settings, scans):
     _create(repo)
     repo.save_snapshot(snapshot)
-    repo.save_scan("run-1", snapshot.snapshot_id, scans[0])
-    loaded = repo.load_scans_for_snapshot(snapshot.snapshot_id)
-    assert len(loaded) == 1 and len(loaded[0].vulnerabilities) == 3
-    assert loaded[0].counts == scans[0].counts
+    scan_id = repo.save_scan("run-1", snapshot.snapshot_id, scans[0])
+    n = repo.conn.execute(
+        "SELECT COUNT(*) FROM vulnerabilities WHERE scan_id = ?", (scan_id,)
+    ).fetchone()[0]
+    assert n == 3
 
     findings = rules.evaluate(snapshot, settings.rules)
     repo.save_findings("run-1", findings)
@@ -161,32 +156,21 @@ def _agent_outputs(snapshot, scans, findings):
                 ],
                 vulnerability_ids=[],
                 explanation="pivot",
-                remediation="split",
             )
         ],
-        recommendations=["Split networks"],
         limitations=["none"],
     )
-    validation = validate_agent_output(assessment, snapshot, scans)
     report = build_agent_report(
         run_id="run-x",
         model=MODEL,
         prompt_version="v4",
         agent_status="ok",
         snapshot_id=snapshot.snapshot_id,
-        validation=validation,
+        assessment=assessment,
         errors=[],
         metrics=RunMetrics(started_at=datetime.now(UTC)),
     )
-    comparison = compare(
-        run_id="run-x",
-        model=MODEL,
-        agent_status="ok",
-        deterministic=findings,
-        validation=validation,
-        snapshot=snapshot,
-    )
-    return report, comparison
+    return report
 
 
 def test_deterministic_report_has_no_agent_content(snapshot, settings, scans):
@@ -228,35 +212,49 @@ def test_markdown_has_all_sections_and_files_are_written(snapshot, settings, sca
         assert secret not in json_path.read_text() and secret not in md
 
 
-def test_agent_report_and_comparison_files(snapshot, settings, scans, tmp_path, repo):
+def test_agent_report_files(snapshot, settings, scans, tmp_path, repo):
     _, findings = _report(snapshot, settings, scans)
-    agent_report, comparison = _agent_outputs(snapshot, scans, findings)
+    agent_report = _agent_outputs(snapshot, scans, findings)
     assert [f.resource_name for f in agent_report.findings] == ["router"]
     assert agent_report.overall_risk == "high"
-    assert ("N002", "router") in {
-        (m.deterministic.rule_id, m.deterministic.resource_name) for m in comparison.found
-    }
 
     md = render_agent_markdown(agent_report, [])
-    for heading in ("1. Summary", "2. Findings", "3. Rejected findings", "6. Execution metrics"):
+    for heading in ("1. Summary", "2. Findings", "3. Limitations", "4. Execution metrics"):
         assert f"## {heading}" in md, heading
-    cmp_md = render_comparison_markdown(comparison)
-    for heading in ("1. Scores", "2. Missed by the agent", "3. Found by the agent"):
-        assert f"## {heading}" in cmp_md, heading
-
+    assert "Recommendations" not in md and "Remediation" not in md  # prompt v9
     a_path = write_agent_report(agent_report, [], tmp_path)
-    c_path = write_comparison(comparison, tmp_path)
-    assert (a_path.name, c_path.name) == ("agent_report.md", "comparison.md")
+    assert a_path.name == "agent_report.md"
     assert AgentReport.model_validate_json(a_path.with_suffix(".json").read_text())
-    assert Comparison.model_validate_json(c_path.with_suffix(".json").read_text())
+    assert not (tmp_path / "comparison.md").exists()  # no scoring against the rules
 
     # stored and reloaded from SQLite
     _create(repo, "run-x")
     repo.save_agent_report("run-x", agent_report)
-    repo.save_comparison("run-x", comparison)
     assert repo.load_agent_report("run-x") == agent_report
-    assert repo.load_comparison("run-x").scores == comparison.scores
     assert repo.load_report("run-x") is None
+
+
+def test_agent_findings_are_reported_as_given():
+    """No validator: invented resources and wrong CVEs are kept as the agent wrote
+    them (status potential, confidence low); only exact repeats are dropped."""
+    from docker_security_agent.reporting.agent_report import agent_findings
+
+    def finding(resource, title, cves=()):
+        return AgentFinding(title=title, resource_name=resource, severity="high",
+                            evidence=[AgentEvidence(tool="container_inspect",
+                                                    field="Config.User", value="")],
+                            vulnerability_ids=list(cves), explanation="e")
+
+    a = AgentAssessment(
+        executive_summary="s", overall_risk="high", limitations=[],
+        findings=[finding("ghost-container", "Invented"), finding("plc", "Root", ["cve-1"]),
+                  finding("plc", "Root")],
+    )
+    out = agent_findings(a)
+    assert [(f.resource_name, f.title) for f in out] == [("ghost-container", "Invented"),
+                                                          ("plc", "Root")]
+    assert out[1].references == ["CVE-1"]
+    assert all(f.status == "potential" and f.confidence == "low" for f in out)
 
 
 def test_agent_report_without_valid_assessment():
@@ -266,7 +264,7 @@ def test_agent_report_without_valid_assessment():
         prompt_version="v4",
         agent_status="timeout",
         snapshot_id="snap-1",
-        validation=None,
+        assessment=None,
         errors=["agent: too slow"],
         metrics=RunMetrics(started_at=datetime.now(UTC)),
     )
